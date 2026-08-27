@@ -36,9 +36,6 @@ export function progressPulseForEvent(event) {
   if (item.type === "mcp_tool_call" && item.status === "failed") {
     return "En ekstern sjekk feilet; Codex prøver en annen trygg vei.";
   }
-  if (item.type === "web_search") {
-    return "Eksternt underlag er hentet; vurderingen fortsetter.";
-  }
   return "";
 }
 

@@ -11,6 +11,8 @@ import {
 import {
   allowsLongResponse,
   analyzeStyle,
+  CODEX_START_CONTRACT,
+  compactGuidanceForPrompt,
   guidanceForPrompt,
   isExactOutputRequest,
   shouldRevise,
@@ -31,6 +33,10 @@ async function readInput() {
 
 function emit(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
+}
+
+function continueQuietly() {
+  if (isClaudeHost()) emit({ continue: true });
 }
 
 const mode = process.argv[2];
@@ -69,11 +75,15 @@ if (mode === "session-start") {
     emit({
       hookSpecificOutput: {
         hookEventName: "SessionStart",
-        additionalContext: activation.profile === "quiet" ? QUIET_CONTRACT : VOICE_CONTRACT
+        additionalContext: activation.profile === "quiet"
+          ? QUIET_CONTRACT
+          : isClaudeHost()
+            ? VOICE_CONTRACT
+            : CODEX_START_CONTRACT
       }
     });
   } else {
-    emit({ continue: true });
+    continueQuietly();
   }
 } else if (mode === "prompt-submit") {
   const activation = readActivation(sessionId);
@@ -86,14 +96,18 @@ if (mode === "session-start") {
     });
   }
   if (activationForEvent().profile === "full") {
+    const guidance = isClaudeHost()
+      ? guidanceForPrompt(input.prompt || "")
+      : compactGuidanceForPrompt(input.prompt || "");
+    if (!guidance) process.exit(0);
     emit({
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
-        additionalContext: guidanceForPrompt(input.prompt || "")
+        additionalContext: guidance
       }
     });
   } else {
-    emit({ continue: true });
+    continueQuietly();
   }
 } else if (mode === "stop") {
   const activation = readActivation(sessionId);
@@ -108,11 +122,11 @@ if (mode === "session-start") {
       reason: `Rewrite the final answer once in plain, natural language. Preserve all decision-relevant facts, proof, warnings, citations, and authorization boundaries. Omit internal process and low-level mechanics unless the user asked for them. Correct these communication problems: ${issues.map((issue) => issue.message).join(" ")} Default to 120 words or fewer. Return only the replacement final answer.`
     });
   } else {
-    emit({ continue: true });
+    continueQuietly();
   }
 } else if (mode === "session-end") {
   clearActivation(sessionId);
-  emit({ continue: true });
+  continueQuietly();
 } else {
-  emit({ continue: true });
+  continueQuietly();
 }

@@ -12,6 +12,8 @@ export const VOICE_CONTRACT = `Fable-ous communication contract:
 - Never hide safety warnings, authorization boundaries, uncertainty, failed verification, or required evidence.
 - Exact-output requests override this style contract.`;
 
+export const CODEX_START_CONTRACT = `Fable-ous: lead with the outcome; infer the goal and continue through safe in-scope work without routine permission questions; use warm, plain, compact language; prefer one recommendation and reason; trust client tool receipts and speak only for material findings, risks, blockers, decisions, changed direction, or proof; never hide failure, uncertainty, evidence, or authorization boundaries; obey exact-output requests.`;
+
 export const QUIET_CONTRACT = `Fable-ous quiet-pulse contract for native Fable:
 - The client already shows tool receipts. Never paraphrase commands, reads, writes, shell counts, or the running job inventory.
 - Work quietly between receipts. Give one brief update only when a finding, risk, blocker, required decision, or direction materially changes.
@@ -24,6 +26,11 @@ export function isExactOutputRequest(prompt = "") {
 
 export function allowsLongResponse(prompt = "") {
   return /\b(?:detailed|thorough|comprehensive|in[- ]depth|detaljert|grundig|utfyllende|dyptgående|fullstendig)\b|\b\d{3,}\s+(?:words?|ord)\b/i.test(prompt);
+}
+
+export function isTrivialPrompt(prompt = "") {
+  const value = String(prompt).trim().replace(/[.!?]+$/u, "").trim();
+  return /^(?:hei|hallo|heisann|hello|hey|hi|god morgen|god kveld|takk|tusen takk|thanks|thank you|hvem er du|hva er du|who are you|what are you|hvordan går det|how are you)$/iu.test(value);
 }
 
 const MODE_CARDS = {
@@ -62,6 +69,20 @@ export function classifyPrompt(prompt = "") {
 export function guidanceForPrompt(prompt = "") {
   const mode = classifyPrompt(prompt);
   return `${MODE_CARDS[mode]}\n${MODE_EXAMPLES[mode]}`;
+}
+
+const COMPACT_MODE_CARDS = {
+  action: `Act before narrating. Stay quiet between client receipts; speak only if a finding, risk, blocker, required decision, direction, or proof state materially changes. Finish with the result, proof, and real remainder.`,
+  correction: `Accept a valid correction plainly, state the corrected understanding, and act. Do not defend or recap.`,
+  decision: `Give one clear recommendation first and why it matters. Reject weak paths plainly; keep secondary tradeoffs brief.`,
+  explain: `Answer the real question in plain language. Use technical detail only when it helps the user decide or verify.`,
+  status: `Give the honest state, missing proof or blocker, and exact next action. Avoid ceremonial reporting.`,
+  default: ``
+};
+
+export function compactGuidanceForPrompt(prompt = "") {
+  if (isTrivialPrompt(prompt) || isExactOutputRequest(prompt)) return "";
+  return COMPACT_MODE_CARDS[classifyPrompt(prompt)];
 }
 
 function wordCount(text) {

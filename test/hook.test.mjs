@@ -4,28 +4,34 @@ import test from "node:test";
 
 const hook = new URL("../plugins/fable-ous/scripts/hook.mjs", import.meta.url);
 
-function runHook(mode, input, env = {}) {
+function runHookRaw(mode, input, env = {}) {
   const result = spawnSync(process.execPath, [hook.pathname, mode], {
     input: JSON.stringify(input),
     encoding: "utf8",
     env: { ...process.env, ...env }
   });
   assert.equal(result.status, 0, result.stderr);
-  return JSON.parse(result.stdout);
+  return result.stdout;
 }
 
-test("SessionStart injects the shared contract", () => {
+function runHook(mode, input, env = {}) {
+  const stdout = runHookRaw(mode, input, env);
+  assert.notEqual(stdout.trim(), "", `${mode} unexpectedly emitted no output`);
+  return JSON.parse(stdout);
+}
+
+test("Codex SessionStart injects the full behavior in one compact line", () => {
   const output = runHook("session-start", { source: "startup" });
-  assert.match(output.hookSpecificOutput.additionalContext, /Lead with the outcome/);
-  assert.match(output.hookSpecificOutput.additionalContext, /tool receipts as sufficient/i);
+  assert.match(output.hookSpecificOutput.additionalContext, /lead with the outcome/i);
+  assert.match(output.hookSpecificOutput.additionalContext, /trust client tool receipts/i);
+  assert.match(output.hookSpecificOutput.additionalContext, /never hide failure/i);
+  assert.equal(output.hookSpecificOutput.additionalContext.includes("\n"), false);
 });
 
 test("Codex can be forced off for controlled comparisons", () => {
   const env = { FABLE_OUS_FORCE: "off" };
-  const started = runHook("session-start", { source: "startup" }, env);
-  assert.equal(started.continue, true);
-  const prompt = runHook("prompt-submit", { prompt: "Fiks dette" }, env);
-  assert.equal(prompt.continue, true);
+  assert.equal(runHookRaw("session-start", { source: "startup" }, env), "");
+  assert.equal(runHookRaw("prompt-submit", { prompt: "Fiks dette" }, env), "");
 });
 
 test("UserPromptSubmit injects task-specific guidance", () => {
@@ -33,12 +39,16 @@ test("UserPromptSubmit injects task-specific guidance", () => {
   assert.match(output.hookSpecificOutput.additionalContext, /honest state/i);
 });
 
+test("Codex prompt hook is silent for greetings and identity questions", () => {
+  assert.equal(runHookRaw("prompt-submit", { prompt: "hei" }), "");
+  assert.equal(runHookRaw("prompt-submit", { prompt: "hvem er du?" }), "");
+});
+
 test("Stop requests one rewrite for a templated answer", () => {
   const output = runHook("stop", { last_assistant_message: "Status: done", stop_hook_active: false });
   assert.equal(output.decision, "block");
 
-  const second = runHook("stop", { last_assistant_message: "Status: done", stop_hook_active: true });
-  assert.equal(second.continue, true);
+  assert.equal(runHookRaw("stop", { last_assistant_message: "Status: done", stop_hook_active: true }), "");
 });
 
 test("Stop may clean up once after another verifier hook", () => {
@@ -53,32 +63,30 @@ test("Stop may clean up once after another verifier hook", () => {
   });
   assert.equal(first.decision, "block");
 
-  const second = runHook("stop", {
+  const second = runHookRaw("stop", {
     session_id: sessionId,
     last_assistant_message: "Status: NOT VERIFIED",
     stop_hook_active: true
   });
-  assert.equal(second.continue, true);
-  runHook("session-end", { session_id: sessionId });
+  assert.equal(second, "");
+  assert.equal(runHookRaw("session-end", { session_id: sessionId }), "");
 });
 
 test("exact-output prompt bypasses the Stop rewrite", () => {
   const sessionId = `test-exact-${process.pid}`;
   runHook("session-start", { session_id: sessionId, source: "startup" });
-  runHook("prompt-submit", { session_id: sessionId, prompt: "Svar kun med ordet OK." });
-  const output = runHook("stop", { session_id: sessionId, last_assistant_message: "Status: done", stop_hook_active: false });
-  assert.equal(output.continue, true);
-  runHook("session-end", { session_id: sessionId });
+  assert.equal(runHookRaw("prompt-submit", { session_id: sessionId, prompt: "Svar kun med ordet OK." }), "");
+  assert.equal(runHookRaw("stop", { session_id: sessionId, last_assistant_message: "Status: done", stop_hook_active: false }), "");
+  assert.equal(runHookRaw("session-end", { session_id: sessionId }), "");
 });
 
 test("explicitly detailed prompt may exceed the routine length gate", () => {
   const sessionId = `test-long-${process.pid}`;
   runHook("session-start", { session_id: sessionId, source: "startup" });
-  runHook("prompt-submit", { session_id: sessionId, prompt: "Skriv en detaljert analyse på 500 ord." });
+  assert.equal(runHookRaw("prompt-submit", { session_id: sessionId, prompt: "Skriv en detaljert analyse på 500 ord." }), "");
   const longAnswer = Array.from({ length: 200 }, () => "ord").join(" ");
-  const output = runHook("stop", { session_id: sessionId, last_assistant_message: longAnswer, stop_hook_active: false });
-  assert.equal(output.continue, true);
-  runHook("session-end", { session_id: sessionId });
+  assert.equal(runHookRaw("stop", { session_id: sessionId, last_assistant_message: longAnswer, stop_hook_active: false }), "");
+  assert.equal(runHookRaw("session-end", { session_id: sessionId }), "");
 });
 
 test("Claude Fable receives only the quiet-pulse contract", () => {

@@ -79,4 +79,8 @@ test("progress pulses ignore successful command receipts and report failed check
     type: "item.completed",
     item: { type: "command_execution", status: "failed" }
   }), "En sjekk feilet; årsaken undersøkes.");
+  assert.equal(progressPulseForEvent({
+    type: "item.completed",
+    item: { type: "web_search", status: "completed" }
+  }), "");
 });

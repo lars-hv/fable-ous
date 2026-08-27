@@ -99,10 +99,10 @@ async function askOnce(prompt, options) {
 async function interactive(options) {
   const session = createStrictSession(strictOptions(options));
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
-  process.stdout.write("Fable-ous strict mode. Raw Codex responses stay hidden. Type /exit to quit.\n\n");
+  process.stdout.write("Fable-ous · clean  (/exit to quit)\n\n");
   try {
     while (true) {
-      const prompt = (await terminal.question("you › ")).trim();
+      const prompt = (await terminal.question("› ")).trim();
       if (!prompt) continue;
       if (prompt === "/exit" || prompt === "/quit") break;
       const result = await runStrictTurn({
@@ -110,7 +110,7 @@ async function interactive(options) {
         prompt,
         onProgress: (message) => process.stdout.write(`\n· ${message}\n`)
       });
-      process.stdout.write(`\nfable-ous › ${result.answer}\n\n`);
+      process.stdout.write(`\n${result.answer}\n\n`);
     }
   } finally {
     terminal.close();

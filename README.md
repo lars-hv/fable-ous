@@ -12,7 +12,7 @@ Fable-ous is independent open-source software. It is not affiliated with, endors
 
 ### Standard plugin
 
-The plugin injects a short communication contract at session start, adds task-specific guidance for each prompt, and catches a small set of measurable final-answer failures.
+The plugin injects one compact communication line at session start, adds short task-specific guidance only when the prompt needs it, and catches a small set of measurable final-answer failures. Greetings, identity questions, thanks, exact-output requests, and ordinary prompts produce no prompt-hook output.
 
 ```bash
 git clone https://github.com/lars-hv/fable-ous.git
@@ -44,7 +44,7 @@ The Fable launcher explicitly selects the quiet-pulse profile; it does not add t
 
 ### Strict mode
 
-Strict mode runs through the official Codex SDK. It buffers the raw Codex response, always renders a communication-only final pass, and shows only that final answer. It may show a small number of deterministic milestone pulses for completed external research, file changes, or failed checks; raw model commentary and tool details stay hidden. Exact-output requests bypass the renderer.
+Strict mode runs through the official Codex SDK. It buffers the raw Codex response, always renders a communication-only final pass, and shows only that final answer. The terminal uses a minimal prompt without speaker labels. It may show a small number of deterministic milestone pulses for file changes or failed checks; successful commands, reads, and research stay quiet. Raw model commentary and tool details stay hidden. Exact-output requests bypass the renderer.
 
 ```bash
 fable-ous strict --cwd /path/to/project
@@ -60,7 +60,7 @@ Strict mode preserves the user's existing Codex authentication. It uses `model_v
 
 ## What the standard plugin cannot do
 
-Codex lifecycle hooks can add developer context and request another pass, but they cannot retract text already streamed by the standard Codex interface. Higher-priority platform instructions also remain authoritative. Use strict mode when only the checked final answer may be visible.
+Codex lifecycle hooks can add developer context and request another pass, but they cannot skin the terminal, hide native `Ran`/`Explored` receipts, or retract text already streamed by the standard Codex interface. Codex currently parses hook `suppressOutput` but does not implement it, and higher-priority platform or skill instructions remain authoritative. Use strict mode when only the checked final answer may be visible.
 
 ## Claude's built-in controls
 
