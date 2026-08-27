@@ -1,140 +1,82 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+
+import { ensureCodexStyleLayer } from "../plugins/fable-ous/scripts/activation.mjs";
 
 const hook = new URL("../plugins/fable-ous/scripts/hook.mjs", import.meta.url);
 
-function runHook(mode, input, env = {}) {
+function runHookRaw(mode, input, env = {}) {
   const result = spawnSync(process.execPath, [hook.pathname, mode], {
     input: JSON.stringify(input),
     encoding: "utf8",
     env: { ...process.env, ...env }
   });
   assert.equal(result.status, 0, result.stderr);
-  return JSON.parse(result.stdout);
+  return result.stdout;
 }
 
-test("SessionStart injects the shared contract", () => {
-  const output = runHook("session-start", { source: "startup" });
-  assert.match(output.hookSpecificOutput.additionalContext, /Lead with the outcome/);
-  assert.match(output.hookSpecificOutput.additionalContext, /tool receipts as sufficient/i);
+function runHook(mode, input, env = {}) {
+  const stdout = runHookRaw(mode, input, env);
+  assert.notEqual(stdout.trim(), "", `${mode} unexpectedly emitted no output`);
+  return JSON.parse(stdout);
+}
+
+function isolatedEnv(prefix) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  return {
+    FABLE_OUS_CONFIG_DIR: join(root, "config"),
+    FABLE_OUS_AGENTS_PATH: join(root, "AGENTS.md")
+  };
+}
+
+test("Codex SessionStart stays completely silent when the durable style layer is active", () => {
+  const env = isolatedEnv("fable-ous-hook-style-");
+  ensureCodexStyleLayer({ configDir: env.FABLE_OUS_CONFIG_DIR, agentsPath: env.FABLE_OUS_AGENTS_PATH });
+  assert.equal(runHookRaw("session-start", { source: "startup" }, env), "");
 });
 
-test("Codex can be forced off for controlled comparisons", () => {
-  const env = { FABLE_OUS_FORCE: "off" };
-  const started = runHook("session-start", { source: "startup" }, env);
-  assert.equal(started.continue, true);
-  const prompt = runHook("prompt-submit", { prompt: "Fiks dette" }, env);
-  assert.equal(prompt.continue, true);
+test("plugin-only Codex SessionStart injects one compact fallback line", () => {
+  const env = isolatedEnv("fable-ous-hook-fallback-");
+  const output = runHook("session-start", { source: "startup" }, env);
+  assert.match(output.hookSpecificOutput.additionalContext, /lead with the outcome/i);
+  assert.equal(output.hookSpecificOutput.additionalContext.includes("\n"), false);
 });
 
-test("UserPromptSubmit injects task-specific guidance", () => {
-  const output = runHook("prompt-submit", { prompt: "Er dette faktisk ferdig?" });
-  assert.match(output.hookSpecificOutput.additionalContext, /honest state/i);
+test("Codex prompt and stop hooks are always silent", () => {
+  const env = isolatedEnv("fable-ous-hook-no-state-");
+  assert.equal(runHookRaw("prompt-submit", { prompt: "API_TOKEN_EXAMPLE" }, env), "");
+  assert.equal(runHookRaw("stop", { last_assistant_message: "Status: done" }, env), "");
+  assert.equal(existsSync(env.FABLE_OUS_CONFIG_DIR), false);
 });
 
-test("Stop requests one rewrite for a templated answer", () => {
-  const output = runHook("stop", { last_assistant_message: "Status: done", stop_hook_active: false });
-  assert.equal(output.decision, "block");
-
-  const second = runHook("stop", { last_assistant_message: "Status: done", stop_hook_active: true });
-  assert.equal(second.continue, true);
+test("the installed hook manifest contains only SessionStart", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../plugins/fable-ous/hooks/hooks.json", import.meta.url), "utf8"));
+  assert.deepEqual(Object.keys(manifest.hooks), ["SessionStart"]);
 });
 
-test("Stop may clean up once after another verifier hook", () => {
-  const sessionId = `test-verifier-${process.pid}`;
-  runHook("session-start", { session_id: sessionId, source: "startup" });
-  runHook("prompt-submit", { session_id: sessionId, prompt: "Fiks dette" });
-
-  const first = runHook("stop", {
-    session_id: sessionId,
-    last_assistant_message: "Status: NOT VERIFIED",
-    stop_hook_active: true
-  });
-  assert.equal(first.decision, "block");
-
-  const second = runHook("stop", {
-    session_id: sessionId,
-    last_assistant_message: "Status: NOT VERIFIED",
-    stop_hook_active: true
-  });
-  assert.equal(second.continue, true);
-  runHook("session-end", { session_id: sessionId });
-});
-
-test("exact-output prompt bypasses the Stop rewrite", () => {
-  const sessionId = `test-exact-${process.pid}`;
-  runHook("session-start", { session_id: sessionId, source: "startup" });
-  runHook("prompt-submit", { session_id: sessionId, prompt: "Svar kun med ordet OK." });
-  const output = runHook("stop", { session_id: sessionId, last_assistant_message: "Status: done", stop_hook_active: false });
-  assert.equal(output.continue, true);
-  runHook("session-end", { session_id: sessionId });
-});
-
-test("explicitly detailed prompt may exceed the routine length gate", () => {
-  const sessionId = `test-long-${process.pid}`;
-  runHook("session-start", { session_id: sessionId, source: "startup" });
-  runHook("prompt-submit", { session_id: sessionId, prompt: "Skriv en detaljert analyse på 500 ord." });
-  const longAnswer = Array.from({ length: 200 }, () => "ord").join(" ");
-  const output = runHook("stop", { session_id: sessionId, last_assistant_message: longAnswer, stop_hook_active: false });
-  assert.equal(output.continue, true);
-  runHook("session-end", { session_id: sessionId });
+test("Codex can be forced off without producing a receipt body", () => {
+  assert.equal(runHookRaw("session-start", { source: "startup" }, { FABLE_OUS_FORCE: "off" }), "");
 });
 
 test("Claude Fable receives only the quiet-pulse contract", () => {
-  const sessionId = `test-fable-${process.pid}`;
   const env = { CLAUDE_PLUGIN_ROOT: "/tmp/fable-ous", PLUGIN_ROOT: "" };
-  const started = runHook("session-start", { session_id: sessionId, source: "startup", model: "claude-fable-5" }, env);
-  assert.match(started.hookSpecificOutput.additionalContext, /quiet-pulse contract/i);
-  assert.doesNotMatch(started.hookSpecificOutput.additionalContext, /Prefer one recommendation/i);
-
-  const prompt = runHook("prompt-submit", { session_id: sessionId, prompt: "Bygg dette" }, env);
-  assert.equal(prompt.continue, true);
-
-  const stop = runHook("stop", { session_id: sessionId, last_assistant_message: "Status: done" }, env);
-  assert.equal(stop.continue, true);
-  runHook("session-end", { session_id: sessionId }, env);
+  const output = runHook("session-start", { source: "startup", model: "claude-fable-5" }, env);
+  assert.match(output.hookSpecificOutput.additionalContext, /quiet-pulse contract/i);
+  assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /Prefer one recommendation/i);
 });
 
-test("Claude Opus receives Fable-ous guidance", () => {
-  const sessionId = `test-opus-${process.pid}`;
+test("Claude Opus receives the full session contract", () => {
   const env = { CLAUDE_PLUGIN_ROOT: "/tmp/fable-ous", PLUGIN_ROOT: "" };
-  const started = runHook("session-start", { session_id: sessionId, source: "startup", model: "claude-opus-5" }, env);
-  assert.match(started.hookSpecificOutput.additionalContext, /Lead with the outcome/);
-
-  const prompt = runHook("prompt-submit", { session_id: sessionId, prompt: "Bør vi bygge dette?" }, env);
-  assert.match(prompt.hookSpecificOutput.additionalContext, /clear recommendation/i);
-  runHook("session-end", { session_id: sessionId }, env);
-});
-
-test("Claude Opus launcher model enables guidance when hook input omits model", () => {
-  const sessionId = `test-opus-env-${process.pid}`;
-  const env = {
-    CLAUDE_PLUGIN_ROOT: "/tmp/fable-ous",
-    PLUGIN_ROOT: "",
-    FABLE_OUS_MODEL: "claude-opus-5",
-    FABLE_OUS_FORCE: "on"
-  };
-  const started = runHook("session-start", { session_id: sessionId, source: "startup" }, env);
-  assert.match(started.hookSpecificOutput.additionalContext, /Lead with the outcome/);
-  runHook("session-end", { session_id: sessionId }, env);
+  const output = runHook("session-start", { source: "startup", model: "claude-opus-5" }, env);
+  assert.match(output.hookSpecificOutput.additionalContext, /Lead with the outcome/);
 });
 
 test("Claude with an unknown model fails closed", () => {
-  const sessionId = `test-unknown-${process.pid}`;
   const env = { CLAUDE_PLUGIN_ROOT: "/tmp/fable-ous", PLUGIN_ROOT: "" };
-  const started = runHook("session-start", { session_id: sessionId, source: "clear" }, env);
-  assert.equal(started.continue, true);
-  runHook("session-end", { session_id: sessionId }, env);
-});
-
-test("Claude clears an old Opus activation when the new model is unknown", () => {
-  const sessionId = `test-switch-${process.pid}`;
-  const env = { CLAUDE_PLUGIN_ROOT: "/tmp/fable-ous", PLUGIN_ROOT: "" };
-  runHook("session-start", { session_id: sessionId, source: "startup", model: "claude-opus-5" }, env);
-  const cleared = runHook("session-start", { session_id: sessionId, source: "clear" }, env);
-  assert.equal(cleared.continue, true);
-  const prompt = runHook("prompt-submit", { session_id: sessionId, prompt: "Bør vi bygge dette?" }, env);
-  assert.equal(prompt.continue, true);
-  runHook("session-end", { session_id: sessionId }, env);
+  const output = runHook("session-start", { source: "clear" }, env);
+  assert.equal(output.continue, true);
 });

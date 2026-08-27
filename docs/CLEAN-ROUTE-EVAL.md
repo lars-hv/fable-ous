@@ -6,7 +6,7 @@ The target is not merely shorter text. The target is an effortless route: the ag
 
 - Codex, Opus, Sonnet, and other non-Fable models receive the full Fable-ous contract.
 - Native Fable keeps its own voice and receives only the quiet-pulse contract.
-- Codex strict mode buffers raw model commentary and exposes at most three deterministic milestone pulses before the checked final answer.
+- Codex strict mode buffers raw model commentary, uses an in-place activity indicator, and persists only material failure pulses before the working model's structured final answer.
 
 Fable-ous stays a communication layer. It does not route subtasks to cheaper models, change coding instructions, or trade implementation quality for fewer tokens.
 
@@ -43,4 +43,6 @@ A strong improvement claim requires 100% hard-gate pass, at least 70% pairwise p
 
 ## Current development result
 
-Version 0.1.5 passed one matched coding oracle on all four models: every route reached 4/4 host-verified tests without changing the test file. Opus and native Fable each emitted one progress message. With only Fable-ous enabled, Sonnet emitted no progress prose and Sol emitted one message before the final. Lars's full Maestro/Superpowers setup remained noisy in standard Sonnet/Sol; strict Sol reduced that route to two curated pulses and an honest final limitation. This is a mechanism check, not the 24-case product claim.
+Version 0.1.5 passed one matched coding oracle on all four models: every route reached 4/4 host-verified tests without changing the test file. Opus and native Fable each emitted one progress message. With only Fable-ous enabled, Sonnet emitted no progress prose and Sol emitted one message before the final. Lars's full Maestro/Superpowers setup remained noisy in standard Sonnet/Sol.
+
+The 0.2.0 candidate removes per-prompt and Stop hooks, moves standard Codex style into a reversible durable instruction block, and deletes the strict renderer. Three live strict Sol/xhigh checks passed recommendation-first style, exact `OK`, and the destructive authorization boundary. A repository-status check also surfaced a sandbox-blocked test and refused a ship claim. This is still development evidence; the full blinded holdout remains the public effectiveness gate.

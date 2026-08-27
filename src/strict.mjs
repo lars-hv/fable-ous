@@ -1,63 +1,129 @@
 import { Codex } from "@openai/codex-sdk";
-import {
-  analyzeStyle,
-  buildRevisionPrompt,
-  isExactOutputRequest,
-  parseRenderedAnswer,
-  VOICE_CONTRACT
-} from "../plugins/fable-ous/scripts/style.mjs";
+import { analyzeStyle, VOICE_CONTRACT } from "../plugins/fable-ous/scripts/style.mjs";
 
-const RENDER_SCHEMA = {
+export const STRICT_OUTPUT_SCHEMA = {
   type: "object",
   properties: {
-    answer: { type: "string" }
+    answer: { type: "string" },
+    material_disclosures: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          kind: {
+            type: "string",
+            enum: ["failure", "uncertainty", "missing_proof", "risk", "authorization"]
+          },
+          text: { type: "string" }
+        },
+        required: ["kind", "text"],
+        additionalProperties: false
+      }
+    }
   },
-  required: ["answer"],
+  required: ["answer", "material_disclosures"],
   additionalProperties: false
 };
 
-const RENDERER_INSTRUCTIONS = `${VOICE_CONTRACT}
+const STRICT_MAIN_INSTRUCTIONS = `${VOICE_CONTRACT}
 
-You are the Fable-ous final-answer renderer. Never call tools. Preserve all decision-relevant facts, evidence, warnings, citations, uncertainty, authorization boundaries, and completion status. Omit internal process, skill names, tool narration, and low-level mechanics unless the user asked for them or they are necessary to trust or act on the answer. Do not add claims or promises. Return only the requested structured answer.`;
+Your final response is the user-visible answer. Return it through the required output schema. Put the natural answer in "answer". Audit every material failed check, uncertainty, missing proof, risk, or authorization boundary in "material_disclosures" with its kind and a short factual text, even when it is already stated naturally in the answer. Never trade correctness, code quality, evidence, or safety for brevity. Do not narrate tools or internal process.`;
 
-export { isExactOutputRequest };
-
-export function progressPulseForEvent(event) {
+function failureDisclosureForEvent(event) {
   if (event?.type !== "item.completed") return "";
   const item = event.item || {};
-  if (item.type === "file_change") {
-    return item.status === "failed"
-      ? "Endringen kunne ikke brukes; årsaken undersøkes."
-      : "Endringen er gjort; verifisering gjenstår.";
+  if (item.type === "error") {
+    return {
+      kind: "failure",
+      text: "En intern Codex-feil oppstod under arbeidet; sluttresultatet må vurderes med det forbeholdet."
+    };
   }
-  if (item.type === "command_execution" && item.status === "failed") {
-    return "En sjekk feilet; årsaken undersøkes.";
-  }
-  if (item.type === "mcp_tool_call" && item.status === "failed") {
-    return "En ekstern sjekk feilet; Codex prøver en annen trygg vei.";
-  }
-  if (item.type === "web_search") {
-    return "Eksternt underlag er hentet; vurderingen fortsetter.";
+  if (["command_execution", "mcp_tool_call", "file_change"].includes(item.type) && item.status === "failed") {
+    return {
+      kind: "failure",
+      text: "En sjekk feilet under arbeidet; sluttresultatet må vurderes med det forbeholdet."
+    };
   }
   return "";
 }
 
-async function runMainTurn(thread, prompt, onProgress) {
-  if (typeof thread.runStreamed !== "function") return thread.run(prompt);
+export function progressPulseForEvent(event) {
+  return failureDisclosureForEvent(event) ? "En sjekk feilet." : "";
+}
 
-  const { events } = await thread.runStreamed(prompt);
-  const items = [];
+export function parseStrictEnvelope(value) {
+  const raw = String(value || "").trim();
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.answer === "string") {
+      return {
+        answer: parsed.answer.trim(),
+        materialDisclosures: Array.isArray(parsed.material_disclosures)
+          ? parsed.material_disclosures
+            .filter((item) => item && typeof item.kind === "string" && typeof item.text === "string" && item.text.trim())
+            .map((item) => ({ kind: item.kind, text: item.text.trim() }))
+          : []
+      };
+    }
+  } catch {
+    // A plain final is retained as a safe compatibility fallback.
+  }
+  return { answer: raw, materialDisclosures: [] };
+}
+
+function answerContainsDisclosure(answer, disclosure) {
+  const value = answer.toLocaleLowerCase();
+  const candidate = disclosure.text.toLocaleLowerCase();
+  if (value.includes(candidate)) return true;
+  const patterns = {
+    failure: /feil|failed|mislykt|blokkert|blocked|ikke bestått/i,
+    uncertainty: /usikker|uncertain|ukjent|unknown|kan ikke bekrefte|cannot confirm/i,
+    missing_proof: /ikke[^.\n]*(?:bevist|verifisert)|mangler[^.\n]*(?:bevis|verifisering)|not[^.\n]*(?:proven|verified)|gjenstår/i,
+    risk: /risiko|risk|\bno-go\b|ikke publiser|do not (?:ship|publish)|blokkert|blocked/i,
+    authorization: /godkjenning|approval|autorisasjon|authorization|ikke[^.\n]*(?:slettet|sendt|endret)|did not[^.\n]*(?:delete|send|change)/i
+  };
+  return patterns[disclosure.kind]?.test(answer) || false;
+}
+
+function normalizeDisclosures(disclosures) {
+  return [...new Map(
+    disclosures
+      .filter((item) => item && typeof item.kind === "string" && typeof item.text === "string" && item.text.trim())
+      .map((item) => [`${item.kind}:${item.text.trim()}`, { kind: item.kind, text: item.text.trim() }])
+  ).values()];
+}
+
+function composeAnswer(answer, modelDisclosures, systemDisclosures) {
+  const cleanAnswer = String(answer || "").trim();
+  const audited = normalizeDisclosures(modelDisclosures);
+  const enforced = normalizeDisclosures(systemDisclosures);
+  const missing = normalizeDisclosures([...audited, ...enforced])
+    .filter((item) => !answerContainsDisclosure(cleanAnswer, item));
+  if (!missing.length) return cleanAnswer;
+  return `${cleanAnswer}${cleanAnswer ? "\n\n" : ""}${missing.map((item) => item.text).join("\n")}`;
+}
+
+async function runMainTurn(thread, prompt, onProgress) {
+  if (typeof thread.runStreamed !== "function") {
+    const turn = await thread.run(prompt, { outputSchema: STRICT_OUTPUT_SCHEMA });
+    return { finalResponse: turn.finalResponse, usage: turn.usage, systemDisclosures: [] };
+  }
+
+  const { events } = await thread.runStreamed(prompt, { outputSchema: STRICT_OUTPUT_SCHEMA });
   const shown = new Set();
+  const systemDisclosures = new Set();
   let finalResponse = "";
   let usage = null;
 
   for await (const event of events) {
     if (event.type === "item.completed") {
-      items.push(event.item);
       if (event.item.type === "agent_message") finalResponse = event.item.text;
 
+      const disclosure = failureDisclosureForEvent(event);
+      if (disclosure) systemDisclosures.add(JSON.stringify(disclosure));
+
       const pulse = progressPulseForEvent(event);
-      if (pulse && shown.size < 3 && !shown.has(pulse)) {
+      if (pulse && !shown.has(pulse)) {
         shown.add(pulse);
         await onProgress?.(pulse);
       }
@@ -70,7 +136,7 @@ async function runMainTurn(thread, prompt, onProgress) {
     }
   }
 
-  return { items, finalResponse, usage };
+  return { finalResponse, usage, systemDisclosures: [...systemDisclosures].map((item) => JSON.parse(item)) };
 }
 
 export function createStrictSession({
@@ -80,67 +146,38 @@ export function createStrictSession({
   sandboxMode = "workspace-write",
   approvalPolicy
 } = {}) {
-  const mainCodex = new Codex({
+  const codex = new Codex({
     config: {
-      developer_instructions: VOICE_CONTRACT,
+      developer_instructions: STRICT_MAIN_INSTRUCTIONS,
       model_verbosity: "low",
       personality: "none"
     }
   });
 
-  const threadOptions = {
-    workingDirectory: cwd,
-    skipGitRepoCheck: true,
-    sandboxMode,
-    ...(model ? { model } : {}),
-    ...(effort ? { modelReasoningEffort: effort } : {}),
-    ...(approvalPolicy ? { approvalPolicy } : {})
-  };
-
   return {
-    mainThread: mainCodex.startThread(threadOptions),
-    createRendererThread() {
-      const rendererCodex = new Codex({
-        config: {
-          developer_instructions: RENDERER_INSTRUCTIONS,
-          model_verbosity: "low",
-          personality: "none"
-        }
-      });
-      return rendererCodex.startThread({
-        workingDirectory: cwd,
-        skipGitRepoCheck: true,
-        sandboxMode: "read-only",
-        approvalPolicy: "never",
-        ...(model ? { model } : {}),
-        ...(effort ? { modelReasoningEffort: effort } : {})
-      });
-    }
+    mainThread: codex.startThread({
+      workingDirectory: cwd,
+      skipGitRepoCheck: true,
+      sandboxMode,
+      ...(model ? { model } : {}),
+      ...(effort ? { modelReasoningEffort: effort } : {}),
+      ...(approvalPolicy ? { approvalPolicy } : {})
+    })
   };
 }
 
-export async function runStrictTurn({ mainThread, createRendererThread, prompt, onProgress }) {
+export async function runStrictTurn({ mainThread, prompt, onProgress }) {
   const turn = await runMainTurn(mainThread, prompt, onProgress);
-  const raw = String(turn.finalResponse || "").trim();
-  const issues = analyzeStyle(raw);
-
-  if (isExactOutputRequest(prompt)) {
-    return { answer: raw, raw, revised: false, issues, usage: turn.usage };
-  }
-
-  const rendererThread = createRendererThread();
-  const renderedTurn = await rendererThread.run(
-    buildRevisionPrompt({ raw, userPrompt: prompt, issues }),
-    { outputSchema: RENDER_SCHEMA }
-  );
-  const answer = parseRenderedAnswer(renderedTurn.finalResponse);
+  const envelope = parseStrictEnvelope(turn.finalResponse);
+  const disclosures = [...envelope.materialDisclosures, ...turn.systemDisclosures];
+  const answer = composeAnswer(envelope.answer, envelope.materialDisclosures, turn.systemDisclosures);
+  if (!answer) throw new Error("Codex returned an empty final answer.");
 
   return {
-    answer: answer || raw,
-    raw,
-    revised: Boolean(answer),
-    issues,
-    usage: turn.usage,
-    rendererUsage: renderedTurn.usage
+    answer,
+    revised: false,
+    issues: analyzeStyle(answer),
+    disclosures: [...new Map(disclosures.map((item) => [`${item.kind}:${item.text}`, item])).values()],
+    usage: turn.usage
   };
 }

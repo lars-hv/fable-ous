@@ -12,7 +12,7 @@ Fable-ous is independent open-source software. It is not affiliated with, endors
 
 ### Standard plugin
 
-The plugin injects a short communication contract at session start, adds task-specific guidance for each prompt, and catches a small set of measurable final-answer failures.
+The installer adds one reversible Fable-ous block to the user's global Codex `AGENTS.md`, or recognizes an existing contract that already covers the same behavior. Codex then receives the style through its normal instruction stack with no per-prompt hook text. The plugin records only that the durable layer is active; it never stores prompts or responses.
 
 ```bash
 git clone https://github.com/lars-hv/fable-ous.git
@@ -23,6 +23,14 @@ fable-ous install
 ```
 
 Start a fresh Codex or Claude Code session after installation.
+
+When the durable Codex layer is active, the Codex hook emits no text. A plugin-only install that has not run `fable-ous install` falls back to one compact SessionStart line so the plugin still improves behavior. Fable-ous intentionally has no UserPromptSubmit or Stop hook.
+
+Remove only the managed instruction block without touching other user instructions:
+
+```bash
+fable-ous style-off
+```
 
 Fable-ous is always active in Codex. In Claude Code, the SessionStart hook uses the model identifier when Claude provides it: Opus, Sonnet, and other non-Fable models receive the full communication contract. Native Fable receives only the small quiet-pulse contract, preserving its own voice while reducing duplicate progress narration. If Claude omits its model identifier, Fable-ous fails closed and stays off. The bundled Claude output style is available as a manual override but is not forced.
 
@@ -44,7 +52,9 @@ The Fable launcher explicitly selects the quiet-pulse profile; it does not add t
 
 ### Strict mode
 
-Strict mode runs through the official Codex SDK. It buffers the raw Codex response, always renders a communication-only final pass, and shows only that final answer. It may show a small number of deterministic milestone pulses for completed external research, file changes, or failed checks; raw model commentary and tool details stay hidden. Exact-output requests bypass the renderer.
+Strict mode runs through the official Codex SDK. It hides raw model commentary and successful tool mechanics, shows a temporary in-place activity indicator, and keeps only material failure pulses plus the final answer.
+
+There is no second renderer model. The working Codex model performs the task and returns its own user-visible answer through a structured final envelope. Material failures, uncertainty, missing proof, risk, and authorization boundaries are audited separately; if the natural answer omits one, the client appends it instead of polishing it away. This removes the old rewrite boundary and its extra model turn.
 
 ```bash
 fable-ous strict --cwd /path/to/project
@@ -56,11 +66,11 @@ For one prompt:
 fable-ous ask "Give me the direct recommendation" --cwd /path/to/project
 ```
 
-Strict mode preserves the user's existing Codex authentication. It uses `model_verbosity=low`, `personality=none`, and the user's current model unless `--model` is provided. The renderer is read-only: it cannot change code, run tools, or upgrade an unverified result into a success claim. It requires one additional Codex turn.
+Strict mode preserves the user's existing Codex authentication. It uses `model_verbosity=low`, `personality=none`, and the user's current model unless `--model` is provided. Communication shaping does not alter the patch or run a second coding model.
 
 ## What the standard plugin cannot do
 
-Codex lifecycle hooks can add developer context and request another pass, but they cannot retract text already streamed by the standard Codex interface. Higher-priority platform instructions also remain authoritative. Use strict mode when only the checked final answer may be visible.
+Codex lifecycle hooks can add developer context, but they cannot retract text already streamed by the standard Codex interface. Codex also controls its own native tool receipts. The durable instruction layer removes Fable-ous's repeated hook dialogs; use strict mode when raw model commentary and successful tool mechanics must stay hidden.
 
 ## Claude's built-in controls
 
@@ -68,9 +78,9 @@ Claude Code includes `Concise` and `Proactive` output styles. Concise reduces pr
 
 ## Honest guarantees
 
-Fable-ous can deterministically guarantee activation in Codex, full-versus-quiet routing when Claude reports its model, one-pass Stop gating for measurable style failures on non-Fable models, and hidden raw output in Codex strict mode. The strict renderer is read-only, so communication cleanup cannot alter the code patch.
+Fable-ous can deterministically guarantee a durable Codex instruction layer after its installer runs, no per-prompt or Stop hooks, full-versus-quiet routing when Claude reports its model, and hidden raw commentary in Codex strict mode. Strict uses the working model's own structured final and preserves detected failed-tool disclosures.
 
-It cannot guarantee identical model personality, suppress already-streamed commentary in ordinary Codex, detect every mid-session Claude model switch, or remain compatible with future client changes without updates. Public claims should be based on the included tests and versioned compatibility checks, not "works for everyone."
+It cannot guarantee identical model personality, hide native receipts in ordinary Codex, detect every mid-session Claude model switch, understand every semantic omission deterministically, or remain compatible with future client changes without updates. Public claims should be based on the included tests and versioned compatibility checks, not "works for everyone."
 
 Verified locally with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Claude Code 2.1.246, and Node.js 24.16.0 on macOS. Claude Code 2.1.237 or newer is recommended for the current output-style controls.
 
@@ -82,6 +92,7 @@ See the dated [verification report](docs/VERIFICATION.md) for live-test evidence
 
 ```text
 fable-ous install [--codex-only]
+fable-ous style-off
 fable-ous doctor
 fable-ous strict [--cwd PATH] [--model MODEL] [--effort LEVEL]
 fable-ous ask "PROMPT" [--cwd PATH] [--model MODEL]

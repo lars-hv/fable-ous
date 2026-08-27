@@ -1,22 +1,9 @@
 #!/usr/bin/env node
 
 import { appendFileSync } from "node:fs";
-import {
-  clearActivation,
-  decideActivation,
-  isClaudeHost,
-  readActivation,
-  writeActivation
-} from "./activation.mjs";
-import {
-  allowsLongResponse,
-  analyzeStyle,
-  guidanceForPrompt,
-  isExactOutputRequest,
-  shouldRevise,
-  QUIET_CONTRACT,
-  VOICE_CONTRACT
-} from "./style.mjs";
+import { pathToFileURL } from "node:url";
+import { decideActivation, isClaudeHost, isCodexStyleLayerActive } from "./activation.mjs";
+import { CODEX_START_CONTRACT, QUIET_CONTRACT, VOICE_CONTRACT } from "./style.mjs";
 
 async function readInput() {
   let data = "";
@@ -30,89 +17,44 @@ async function readInput() {
 }
 
 function emit(value) {
-  process.stdout.write(`${JSON.stringify(value)}\n`);
+  if (value !== null) process.stdout.write(`${JSON.stringify(value)}\n`);
 }
 
-const mode = process.argv[2];
-const input = await readInput();
-const sessionId = input.session_id || input.sessionId || "";
+export function handleHook({ mode, input = {}, env = process.env } = {}) {
+  // Only SessionStart owns style activation. Per-prompt and Stop hooks were
+  // deliberately removed: they made the transcript noisier and created unsafe
+  // state/rewrite boundaries without improving the coding work.
+  if (mode !== "session-start") return null;
 
-if (process.env.FABLE_OUS_DEBUG_FILE) {
-  appendFileSync(
-    process.env.FABLE_OUS_DEBUG_FILE,
-    `${JSON.stringify({
-      mode,
-      inputKeys: Object.keys(input).sort(),
-      model: input.model || "",
-      sessionId,
-      hostSignals: {
-        claudePluginRoot: Boolean(process.env.CLAUDE_PLUGIN_ROOT),
-        pluginRoot: Boolean(process.env.PLUGIN_ROOT),
-        claudePluginData: Boolean(process.env.CLAUDE_PLUGIN_DATA),
-        declaredModel: process.env.FABLE_OUS_MODEL || process.env.ANTHROPIC_MODEL || "",
-        force: process.env.FABLE_OUS_FORCE || ""
-      }
-    })}\n`
-  );
+  const activation = decideActivation({ input, env });
+  if (!activation.enabled) return isClaudeHost(env) ? { continue: true } : null;
+  if (!isClaudeHost(env) && isCodexStyleLayerActive({ env })) return null;
+
+  return {
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: activation.profile === "quiet"
+        ? QUIET_CONTRACT
+        : isClaudeHost(env)
+          ? VOICE_CONTRACT
+          : CODEX_START_CONTRACT
+    }
+  };
 }
 
-function activationForEvent() {
-  if (process.env.FABLE_OUS_FORCE === "off") return { enabled: false, profile: "off" };
-  if (!isClaudeHost()) return { enabled: true, profile: "full" };
-  return readActivation(sessionId) || { enabled: false, profile: "off" };
+async function main() {
+  const mode = process.argv[2];
+  const input = await readInput();
+
+  if (process.env.FABLE_OUS_DEBUG_FILE) {
+    appendFileSync(
+      process.env.FABLE_OUS_DEBUG_FILE,
+      `${JSON.stringify({ mode, model: input.model || "", host: isClaudeHost() ? "claude" : "codex" })}\n`
+    );
+  }
+
+  emit(handleHook({ mode, input }));
 }
 
-if (mode === "session-start") {
-  const activation = decideActivation({ input });
-  writeActivation(sessionId, activation);
-  if (activation.enabled) {
-    emit({
-      hookSpecificOutput: {
-        hookEventName: "SessionStart",
-        additionalContext: activation.profile === "quiet" ? QUIET_CONTRACT : VOICE_CONTRACT
-      }
-    });
-  } else {
-    emit({ continue: true });
-  }
-} else if (mode === "prompt-submit") {
-  const activation = readActivation(sessionId);
-  if (activation) {
-    writeActivation(sessionId, {
-      ...activation,
-      exactOutput: isExactOutputRequest(input.prompt || ""),
-      allowLong: allowsLongResponse(input.prompt || ""),
-      revisionUsed: false
-    });
-  }
-  if (activationForEvent().profile === "full") {
-    emit({
-      hookSpecificOutput: {
-        hookEventName: "UserPromptSubmit",
-        additionalContext: guidanceForPrompt(input.prompt || "")
-      }
-    });
-  } else {
-    emit({ continue: true });
-  }
-} else if (mode === "stop") {
-  const activation = readActivation(sessionId);
-  const issues = analyzeStyle(input.last_assistant_message || "").filter(
-    (issue) => !(activation?.allowLong && issue.code === "too-long")
-  );
-  const revisionAvailable = sessionId ? !activation?.revisionUsed : !input.stop_hook_active;
-  if (!activation?.exactOutput && activationForEvent().profile === "full" && revisionAvailable && process.env.FABLE_OUS_STOP_GATE !== "off" && shouldRevise(issues)) {
-    if (sessionId && activation) writeActivation(sessionId, { ...activation, revisionUsed: true });
-    emit({
-      decision: "block",
-      reason: `Rewrite the final answer once in plain, natural language. Preserve all decision-relevant facts, proof, warnings, citations, and authorization boundaries. Omit internal process and low-level mechanics unless the user asked for them. Correct these communication problems: ${issues.map((issue) => issue.message).join(" ")} Default to 120 words or fewer. Return only the replacement final answer.`
-    });
-  } else {
-    emit({ continue: true });
-  }
-} else if (mode === "session-end") {
-  clearActivation(sessionId);
-  emit({ continue: true });
-} else {
-  emit({ continue: true });
-}
+const invokedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
+if (invokedPath === import.meta.url) await main();

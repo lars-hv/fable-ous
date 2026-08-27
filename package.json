@@ -1,6 +1,6 @@
 {
   "name": "fable-ous",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Outcome-first communication layer for Codex and Claude Code.",
   "author": "Lars",
   "repository": {
@@ -25,7 +25,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check bin/fable-ous.mjs && node --check plugins/fable-ous/scripts/activation.mjs && node --check plugins/fable-ous/scripts/hook.mjs && node --test test/*.test.mjs"
+    "check": "node --check bin/fable-ous.mjs && node --check src/cli.mjs && node --check src/strict.mjs && node --check plugins/fable-ous/scripts/activation.mjs && node --check plugins/fable-ous/scripts/hook.mjs && node --check plugins/fable-ous/scripts/style.mjs && node --test test/*.test.mjs"
   },
   "dependencies": {
     "@openai/codex-sdk": "0.150.1"
@@ -33,7 +33,13 @@
   "engines": {
     "node": ">=18"
   },
-  "keywords": ["codex", "claude-code", "communication", "output-style", "hooks"],
+  "keywords": [
+    "codex",
+    "claude-code",
+    "communication",
+    "output-style",
+    "hooks"
+  ],
   "license": "MIT",
   "private": true
 }

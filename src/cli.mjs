@@ -5,7 +5,13 @@ import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
-import { isFableModel } from "../plugins/fable-ous/scripts/activation.mjs";
+import {
+  ensureCodexStyleLayer,
+  isCodexStyleLayerActive,
+  isFableModel,
+  removeCodexStyleLayer
+} from "../plugins/fable-ous/scripts/activation.mjs";
+import { handleHook } from "../plugins/fable-ous/scripts/hook.mjs";
 import { analyzeStyle } from "../plugins/fable-ous/scripts/style.mjs";
 import { createStrictSession, runStrictTurn } from "./strict.mjs";
 
@@ -99,22 +105,60 @@ async function askOnce(prompt, options) {
 async function interactive(options) {
   const session = createStrictSession(strictOptions(options));
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
-  process.stdout.write("Fable-ous strict mode. Raw Codex responses stay hidden. Type /exit to quit.\n\n");
+  process.stdout.write("Fable-ous · clean  (/exit to quit)\n\n");
   try {
     while (true) {
-      const prompt = (await terminal.question("you › ")).trim();
+      const prompt = (await terminal.question("› ")).trim();
       if (!prompt) continue;
       if (prompt === "/exit" || prompt === "/quit") break;
-      const result = await runStrictTurn({
-        ...session,
-        prompt,
-        onProgress: (message) => process.stdout.write(`\n· ${message}\n`)
-      });
-      process.stdout.write(`\nfable-ous › ${result.answer}\n\n`);
+      const activity = startActivity();
+      let result;
+      try {
+        result = await runStrictTurn({
+          ...session,
+          prompt,
+          onProgress: (message) => activity.note(message)
+        });
+      } finally {
+        activity.stop();
+      }
+      process.stdout.write(`${result.answer}\n\n`);
     }
   } finally {
     terminal.close();
   }
+}
+
+function startActivity(stream = process.stdout) {
+  let timer;
+  let frame = 0;
+  let active = true;
+  const frames = ["·", "··", "···"];
+  const clear = () => {
+    if (stream.isTTY) stream.write("\r\u001b[2K");
+  };
+  const draw = () => {
+    if (stream.isTTY && active) stream.write(`\r${frames[frame++ % frames.length]} Working`);
+  };
+
+  if (stream.isTTY) {
+    draw();
+    timer = setInterval(draw, 280);
+    timer.unref?.();
+  }
+
+  return {
+    note(message) {
+      clear();
+      stream.write(`· ${message}\n`);
+      draw();
+    },
+    stop() {
+      active = false;
+      if (timer) clearInterval(timer);
+      clear();
+    }
+  };
 }
 
 function install(options) {
@@ -123,20 +167,32 @@ function install(options) {
 
   run("codex", ["plugin", "marketplace", "add", ROOT]);
   run("codex", ["plugin", "add", "fable-ous@fable-ous"]);
+  const style = ensureCodexStyleLayer();
 
   if (!options["codex-only"] && commandExists("claude")) {
     run("claude", ["plugin", "validate", pluginRoot]);
     run("claude", ["plugin", "marketplace", "add", ROOT]);
     run("claude", ["plugin", "install", "fable-ous@fable-ous", "--scope", "user"]);
   }
-  process.stdout.write("Fable-ous installed. Start a fresh Codex or Claude Code session.\n");
+  process.stdout.write(`Fable-ous installed. Codex style source: ${style.source}. Start a fresh session.\n`);
+}
+
+function styleOff() {
+  const result = removeCodexStyleLayer();
+  process.stdout.write(result.removed
+    ? "Fable-ous removed its managed Codex instruction block.\n"
+    : "Fable-ous Codex style marker removed; existing user instructions were preserved.\n");
 }
 
 function doctor() {
   const result = {
     codex: { available: commandExists("codex"), installed: false },
     claude: { available: commandExists("claude"), installed: false },
-    config: { modelVerbosity: "unset", personality: "unset" }
+    config: { modelVerbosity: "unset", personality: "unset" },
+    standardMode: {
+      durableStyle: isCodexStyleLayerActive(),
+      perTurnHooksSilent: handleHook({ mode: "prompt-submit" }) === null
+    }
   };
 
   if (result.codex.available) {
@@ -177,7 +233,7 @@ async function lint() {
 }
 
 function help() {
-  process.stdout.write(`Fable-ous\n\nCommands:\n  fable-ous install [--codex-only]\n  fable-ous doctor\n  fable-ous strict [--cwd PATH] [--model MODEL] [--effort LEVEL]\n  fable-ous ask "PROMPT" [--cwd PATH] [--model MODEL]\n  fable-ous opus [...CLAUDE_ARGS]\n  fable-ous fable [...CLAUDE_ARGS]\n  fable-ous claude --model MODEL [...CLAUDE_ARGS]\n  fable-ous lint < response.txt\n`);
+  process.stdout.write(`Fable-ous\n\nCommands:\n  fable-ous install [--codex-only]\n  fable-ous style-off\n  fable-ous doctor\n  fable-ous strict [--cwd PATH] [--model MODEL] [--effort LEVEL]\n  fable-ous ask "PROMPT" [--cwd PATH] [--model MODEL]\n  fable-ous opus [...CLAUDE_ARGS]\n  fable-ous fable [...CLAUDE_ARGS]\n  fable-ous claude --model MODEL [...CLAUDE_ARGS]\n  fable-ous lint < response.txt\n`);
 }
 
 export async function main(argv) {
@@ -186,6 +242,7 @@ export async function main(argv) {
   if (argv[0] === "claude") return launchClaude(argv.slice(1));
   const { command, options } = parseArgs(argv);
   if (command === "install") return install(options);
+  if (command === "style-off") return styleOff();
   if (command === "doctor") return doctor();
   if (command === "lint") return lint();
   if (command === "ask") {

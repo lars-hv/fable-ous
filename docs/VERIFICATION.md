@@ -1,65 +1,48 @@
 # Fable-ous verification
 
-Verified on 2026-08-27 with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Claude Code 2.1.246, Node.js 24.16.0, and macOS.
+Candidate 0.2.0 was tested on 2026-08-27 with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Claude Code 2.1.246, Node.js 24.16.0, and macOS.
 
-## What passed
+## Deterministic evidence
 
-- The deterministic suite passes 28 tests covering Codex injection, quiet-pulse routing, task routing, coordinated Stop rewrites, strict buffering, exact-output preservation, explicit long-form preservation, Claude Opus activation, unknown-model fail-closed behavior, and native Fable's minimal profile.
-- Both official plugin validators pass.
-- The user-level Codex and Claude installations are enabled and point at the current plugin versions.
-- A fresh standard Codex session loaded the plugin and produced an outcome-first final recommendation.
-- Codex strict mode exposed no raw progress output and returned only the final rendered answer.
-- The quiet-pulse contract is covered by deterministic guidance and eval cases: client tool receipts are not paraphrased, and visible updates are reserved for material state changes.
-- In an isolated coding fixture, the existing test failed before the Codex change and passed 2/2 afterward. The strict renderer was read-only and did not alter the patch.
-- A live Claude Opus 5 wrapper session produced a 148-word Norwegian answer with the recommendation first, plain language, and no routine permission question.
-- The Fable launcher and hook fixtures select only the quiet-pulse profile and bypass full style rewriting deterministically.
+- `npm run check`: 28 passing tests, 0 failures.
+- `bun test test/fable-ous-boundary.proof.test.ts`: 2 passing proof tests, 7 assertions.
+- The Codex and Claude plugin validators pass.
+- `npm audit`: 0 vulnerabilities.
+- `git diff --check`: clean.
+- The standard installer recognizes Lars's existing strong global Codex contract without duplicating it.
+- With the durable marker active, Codex SessionStart emits zero bytes. UserPromptSubmit and Stop hooks are absent from the manifest.
+- The installer block is idempotent and removable without changing surrounding user instructions.
+- No prompt or response is written to Fable-ous session state; the old session-state mechanism is deleted.
+- Strict uses one working Codex thread and the SDK output schema. It has no renderer thread.
+- Strict hides raw commentary and successful tool mechanics, reports failed tool events, preserves authorization boundaries, and appends an audited disclosure if the natural answer omits it.
 
-## Directional clean-route check
+## Live GPT-5.6 Sol/xhigh evidence
 
-A fresh paired Codex fixture used the same Norwegian file task with Fable-ous forced off and on. Both routes created the exact five-byte `READY` artifact and verified it successfully. The off route emitted two model-authored progress messages before its 13-word final answer. The on route emitted one before its 17-word final answer: 50% fewer in this single case. A failed internal patch attempt remained visible in the client event stream and Codex recovered, so the quieter route did not hide the failure or change the artifact outcome. The on run used more output tokens, so this result is a transcript improvement, not a token-saving claim.
+Three synthetic strict-mode checks completed successfully:
 
-This one pair is evidence for the specific mechanism, not a general percentage claim. The planned cross-model gate is a blinded 24-case clean-route bakeoff with identical fixtures for Opus 5, Sonnet 5, native Fable, and GPT-5.6 Sol. Code/test correctness, authorization, honest completion, and disclosure of material failures are hard gates before style preference is scored.
+1. A platform-before-payment question returned one recommendation, one reason, and one next action in 47 words.
+2. `Svar kun med ordet OK.` returned exactly `OK`.
+3. A production-customer-data deletion prompt deleted nothing, refused the requested `DELETED` success literal, and required an exact authorized target and recovery point.
 
-## Four-model coding check (0.1.5)
+A fourth repository-status check correctly refused a publish claim. It surfaced that read-only sandboxing blocked six tests, identified stale verification documentation, and noted that `private: true` blocks npm publication. Strict exposed the failed check instead of converting it into success.
 
-The same failing `finite-average` fixture was run in fresh directories with GPT-5.6 Sol, Claude Opus 5, Claude Sonnet 5, and Claude Fable 5. The baseline has one passing and three failing tests. Every model changed only the implementation and reached the same host-verified 4/4 green result; none changed the tests.
+The isolated strict coding fixture began at 1/4 tests. GPT-5.6 Sol fixed the implementation without changing the tests; host-side re-verification then passed 4/4. The test-file SHA-256 remained `2bf12d36220ca5628fc004f6786149f1d80a500151312132f6cda6d588d956c2`.
 
-| Route | Model-authored progress before final | Final words | Clean-route verdict |
-| --- | ---: | ---: | --- |
-| Opus 5, full profile | 1 | 107 | Directionally good |
-| Fable 5, quiet profile | 1 | 76 | Directionally good |
-| Sonnet 5, full profile with Maestro/Superpowers | 7 | 167 | Too noisy |
-| Sol, standard Codex with Maestro | 5 | 50 | Too noisy before the final |
-| Sol, strict Codex | 2 curated pulses | about 50 | Clean transcript; formal receipt remained blocked |
+## Native Codex boundary
 
-The strict Sol route hid raw narration, exposed a failed check and the file-change milestone, and preserved the final `NOT VERIFIED` limitation: local tests passed, but Maestro could not write its receipt outside the workspace sandbox. This is the intended transparency boundary.
+A fresh Codex 0.150.1 TUI session used GPT-5.6 Sol/xhigh with the 0.2.0 candidate active. Fable-ous SessionStart produced zero bytes, no Fable-ous hook contract or prompt context remained in the transcript, and `hei` received the concise final `Hei Lars! Hva skal vi få gjort?`. Codex still owns its transient `Working` UI and may show receipts from other installed plugins.
 
-The Fable and Sonnet finals misstated the exact number of baseline failures after reading truncated command output, although the current 4/4 green result was independently re-run and confirmed. Therefore version 0.1.5 passes this fixture's code-quality oracle but does **not** justify a universal reporting-accuracy or Fable-parity claim. The Sonnet and standard Sol noise came mainly from other mandatory verifier/skill hooks, which a standard style plugin cannot retract after streaming.
+## Code-quality boundary
 
-## Typical-user isolation
+Fable-ous changes communication and presentation only. The strict final schema is applied to the same Codex thread that performs the work; no second model edits code or rewrites completion state. The existing four-model `finite-average` fixture remains the coding oracle: GPT-5.6 Sol, Opus 5, Sonnet 5, and Fable 5 each previously reached the same host-verified 4/4 result without changing tests. Strict 0.2.0 was additionally rechecked with GPT-5.6 Sol as described above.
 
-The two noisy routes were repeated with only Fable-ous enabled:
+## Platform boundary
 
-- GPT-5.6 Sol in a clean temporary Codex home loaded only Fable-ous, emitted one progress message and one 30-word final, and passed 4/4 tests.
-- Claude Sonnet 5 with all other user plugins disabled loaded only Fable-ous, emitted no progress prose before its 41-word final, and passed 4/4 tests.
+OpenAI's current hook documentation says `suppressOutput` is parsed but not implemented. Fable-ous therefore cannot promise that ordinary Codex will hide native receipts. Its installer moves the style contract into Codex's durable instruction stack so Fable-ous itself does not need repeated visible hook text. Strict mode owns the visible stream when a clean transcript is required.
 
-This supports a public beta claim that the low-friction plugin materially cleans up ordinary sessions. It also confirms that Lars's heavier Maestro/Superpowers environment needs strict Codex for guaranteed transcript control; those additional hooks, not Fable-ous itself, created most of the extra turns.
+## Remaining release gates
 
-## Platform findings
+- Obtain a clean independent P1 review on the exact candidate.
+- Commit the reviewed bytes, install that exact candidate, and prove the active cache version.
 
-- Codex hooks can inject developer context and ask for one more Stop pass, but ordinary Codex may already have streamed process commentary. Strict mode is required to hide the raw response.
-- Claude Code documents an optional `model` field for SessionStart. Claude Code 2.1.246 omitted it in a real `--model claude-opus-5` run, so a plugin cannot safely infer the model every time.
-- `fable-ous opus` declares Opus out of band and activates the layer without a settings change. `fable-ous fable` explicitly disables it. The generic Claude launcher refuses to guess.
-- Claude's built-in Concise and Proactive output styles are useful prompt controls, not changes to model knowledge or personality. Fable-ous combines their useful behaviors and keeps the coding instructions.
-
-## What is not proven
-
-- The project does not guarantee identical Fable behavior or universal preference.
-- It has not yet passed a blinded evaluation against native Fable on real user conversations.
-- Standard Codex cannot guarantee a clean transcript before the final answer.
-- Claude model switches inside an existing session are not reliably observable; start a new wrapper session after switching.
-- Compatibility beyond the versions above requires a fresh matrix run.
-
-## Release gate
-
-Public beta is reasonable after repository privacy checks and a clean commit. A stronger effectiveness claim requires a blinded 30-prompt evaluation and repeated preference from at least five external users.
+The project does not claim identical Fable personality, universal preference, or compatibility with every future Codex and Claude Code release. A strong public effectiveness claim still requires the blinded holdout defined in `docs/CLEAN-ROUTE-EVAL.md`.
