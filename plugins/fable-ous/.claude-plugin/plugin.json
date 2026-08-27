@@ -1,0 +1,10 @@
+{
+  "name": "fable-ous",
+  "version": "0.1.2",
+  "description": "Outcome-first, concise, proactive communication for Claude Code and Codex.",
+  "author": {
+    "name": "BrightBoard AS"
+  },
+  "license": "MIT",
+  "keywords": ["communication", "style", "concise", "proactive"]
+}

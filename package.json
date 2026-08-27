@@ -1,0 +1,38 @@
+{
+  "name": "fable-ous",
+  "version": "0.1.2",
+  "description": "Outcome-first communication layer for Codex and Claude Code.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lars-hv/fable-ous.git"
+  },
+  "homepage": "https://github.com/lars-hv/fable-ous#readme",
+  "type": "module",
+  "files": [
+    ".agents/",
+    ".claude-plugin/",
+    "bin/",
+    "docs/",
+    "evals/public/",
+    "plugins/",
+    "src/",
+    "LICENSE",
+    "README.md"
+  ],
+  "bin": {
+    "fable-ous": "./bin/fable-ous.mjs"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check bin/fable-ous.mjs && node --check plugins/fable-ous/scripts/activation.mjs && node --check plugins/fable-ous/scripts/hook.mjs && node --test"
+  },
+  "dependencies": {
+    "@openai/codex-sdk": "0.150.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["codex", "claude-code", "communication", "output-style", "hooks"],
+  "license": "MIT",
+  "private": true
+}

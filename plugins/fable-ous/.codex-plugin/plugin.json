@@ -1,0 +1,32 @@
+{
+  "name": "fable-ous",
+  "version": "0.1.2+codex.20260827141709",
+  "description": "Outcome-first, concise, proactive communication for Codex.",
+  "author": {
+    "name": "BrightBoard AS"
+  },
+  "license": "MIT",
+  "keywords": [
+    "communication",
+    "style",
+    "concise",
+    "proactive",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Fable-ous",
+    "shortDescription": "Make Codex communicate with clarity and judgment.",
+    "longDescription": "Fable-ous gives Codex an outcome-first, concise, proactive communication style while preserving safety, evidence, and authorization boundaries.",
+    "developerName": "BrightBoard AS",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Give me the direct recommendation and why it matters.",
+      "Continue autonomously until a real decision is required.",
+      "Explain this plainly without process narration."
+    ]
+  }
+}
