@@ -60,7 +60,8 @@ export function claudeLaunchPlan(args = [], defaultModel = "") {
     model,
     env: {
       FABLE_OUS_MODEL: model,
-      FABLE_OUS_FORCE: isFableModel(model) ? "off" : "on"
+      FABLE_OUS_FORCE: "on",
+      FABLE_OUS_PROFILE: isFableModel(model) ? "quiet" : "full"
     }
   };
 }
@@ -87,7 +88,11 @@ function strictOptions(options) {
 
 async function askOnce(prompt, options) {
   const session = createStrictSession(strictOptions(options));
-  const result = await runStrictTurn({ ...session, prompt });
+  const result = await runStrictTurn({
+    ...session,
+    prompt,
+    onProgress: (message) => process.stderr.write(`· ${message}\n`)
+  });
   process.stdout.write(`${result.answer}\n`);
 }
 
@@ -100,7 +105,11 @@ async function interactive(options) {
       const prompt = (await terminal.question("you › ")).trim();
       if (!prompt) continue;
       if (prompt === "/exit" || prompt === "/quit") break;
-      const result = await runStrictTurn({ ...session, prompt });
+      const result = await runStrictTurn({
+        ...session,
+        prompt,
+        onProgress: (message) => process.stdout.write(`\n· ${message}\n`)
+      });
       process.stdout.write(`\nfable-ous › ${result.answer}\n\n`);
     }
   } finally {

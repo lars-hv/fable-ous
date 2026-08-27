@@ -17,6 +17,15 @@ function runHook(mode, input, env = {}) {
 test("SessionStart injects the shared contract", () => {
   const output = runHook("session-start", { source: "startup" });
   assert.match(output.hookSpecificOutput.additionalContext, /Lead with the outcome/);
+  assert.match(output.hookSpecificOutput.additionalContext, /tool receipts as sufficient/i);
+});
+
+test("Codex can be forced off for controlled comparisons", () => {
+  const env = { FABLE_OUS_FORCE: "off" };
+  const started = runHook("session-start", { source: "startup" }, env);
+  assert.equal(started.continue, true);
+  const prompt = runHook("prompt-submit", { prompt: "Fiks dette" }, env);
+  assert.equal(prompt.continue, true);
 });
 
 test("UserPromptSubmit injects task-specific guidance", () => {
@@ -30,6 +39,27 @@ test("Stop requests one rewrite for a templated answer", () => {
 
   const second = runHook("stop", { last_assistant_message: "Status: done", stop_hook_active: true });
   assert.equal(second.continue, true);
+});
+
+test("Stop may clean up once after another verifier hook", () => {
+  const sessionId = `test-verifier-${process.pid}`;
+  runHook("session-start", { session_id: sessionId, source: "startup" });
+  runHook("prompt-submit", { session_id: sessionId, prompt: "Fiks dette" });
+
+  const first = runHook("stop", {
+    session_id: sessionId,
+    last_assistant_message: "Status: NOT VERIFIED",
+    stop_hook_active: true
+  });
+  assert.equal(first.decision, "block");
+
+  const second = runHook("stop", {
+    session_id: sessionId,
+    last_assistant_message: "Status: NOT VERIFIED",
+    stop_hook_active: true
+  });
+  assert.equal(second.continue, true);
+  runHook("session-end", { session_id: sessionId });
 });
 
 test("exact-output prompt bypasses the Stop rewrite", () => {
@@ -51,11 +81,12 @@ test("explicitly detailed prompt may exceed the routine length gate", () => {
   runHook("session-end", { session_id: sessionId });
 });
 
-test("Claude Fable bypasses all Fable-ous guidance", () => {
+test("Claude Fable receives only the quiet-pulse contract", () => {
   const sessionId = `test-fable-${process.pid}`;
   const env = { CLAUDE_PLUGIN_ROOT: "/tmp/fable-ous", PLUGIN_ROOT: "" };
   const started = runHook("session-start", { session_id: sessionId, source: "startup", model: "claude-fable-5" }, env);
-  assert.equal(started.continue, true);
+  assert.match(started.hookSpecificOutput.additionalContext, /quiet-pulse contract/i);
+  assert.doesNotMatch(started.hookSpecificOutput.additionalContext, /Prefer one recommendation/i);
 
   const prompt = runHook("prompt-submit", { session_id: sessionId, prompt: "Bygg dette" }, env);
   assert.equal(prompt.continue, true);

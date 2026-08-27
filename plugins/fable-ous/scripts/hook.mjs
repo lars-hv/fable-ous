@@ -14,6 +14,7 @@ import {
   guidanceForPrompt,
   isExactOutputRequest,
   shouldRevise,
+  QUIET_CONTRACT,
   VOICE_CONTRACT
 } from "./style.mjs";
 
@@ -55,9 +56,10 @@ if (process.env.FABLE_OUS_DEBUG_FILE) {
   );
 }
 
-function activeForEvent() {
-  if (!isClaudeHost()) return true;
-  return readActivation(sessionId)?.enabled === true;
+function activationForEvent() {
+  if (process.env.FABLE_OUS_FORCE === "off") return { enabled: false, profile: "off" };
+  if (!isClaudeHost()) return { enabled: true, profile: "full" };
+  return readActivation(sessionId) || { enabled: false, profile: "off" };
 }
 
 if (mode === "session-start") {
@@ -67,7 +69,7 @@ if (mode === "session-start") {
     emit({
       hookSpecificOutput: {
         hookEventName: "SessionStart",
-        additionalContext: VOICE_CONTRACT
+        additionalContext: activation.profile === "quiet" ? QUIET_CONTRACT : VOICE_CONTRACT
       }
     });
   } else {
@@ -79,10 +81,11 @@ if (mode === "session-start") {
     writeActivation(sessionId, {
       ...activation,
       exactOutput: isExactOutputRequest(input.prompt || ""),
-      allowLong: allowsLongResponse(input.prompt || "")
+      allowLong: allowsLongResponse(input.prompt || ""),
+      revisionUsed: false
     });
   }
-  if (activeForEvent()) {
+  if (activationForEvent().profile === "full") {
     emit({
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
@@ -97,7 +100,9 @@ if (mode === "session-start") {
   const issues = analyzeStyle(input.last_assistant_message || "").filter(
     (issue) => !(activation?.allowLong && issue.code === "too-long")
   );
-  if (!activation?.exactOutput && activeForEvent() && !input.stop_hook_active && process.env.FABLE_OUS_STOP_GATE !== "off" && shouldRevise(issues)) {
+  const revisionAvailable = sessionId ? !activation?.revisionUsed : !input.stop_hook_active;
+  if (!activation?.exactOutput && activationForEvent().profile === "full" && revisionAvailable && process.env.FABLE_OUS_STOP_GATE !== "off" && shouldRevise(issues)) {
+    if (sessionId && activation) writeActivation(sessionId, { ...activation, revisionUsed: true });
     emit({
       decision: "block",
       reason: `Rewrite the final answer once in plain, natural language. Preserve all decision-relevant facts, proof, warnings, citations, and authorization boundaries. Omit internal process and low-level mechanics unless the user asked for them. Correct these communication problems: ${issues.map((issue) => issue.message).join(" ")} Default to 120 words or fewer. Return only the replacement final answer.`

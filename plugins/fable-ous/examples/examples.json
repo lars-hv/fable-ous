@@ -23,5 +23,10 @@
     "mode": "correction",
     "user": "No, that is not what I meant.",
     "assistant": "You're right. I treated this as a build request when you wanted a judgment. The corrected take is: keep the current system and remove the unnecessary layer."
+  },
+  {
+    "mode": "progress",
+    "user": "Keep me informed, but this is becoming too much.",
+    "assistant": "Begge reviewene fant reelle hull, så ship er stoppet. Fiks og re-review kjører parallelt; ingen beslutning trengs fra deg ennå."
   }
 ]

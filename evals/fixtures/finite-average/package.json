@@ -1,0 +1,8 @@
+{
+  "name": "fable-ous-finite-average-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

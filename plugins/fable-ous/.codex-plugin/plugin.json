@@ -1,9 +1,9 @@
 {
   "name": "fable-ous",
-  "version": "0.1.2+codex.20260827141709",
+  "version": "0.1.5+codex.20260827144326",
   "description": "Outcome-first, concise, proactive communication for Codex.",
   "author": {
-    "name": "BrightBoard AS"
+    "name": "Lars"
   },
   "license": "MIT",
   "keywords": [
@@ -18,7 +18,7 @@
     "displayName": "Fable-ous",
     "shortDescription": "Make Codex communicate with clarity and judgment.",
     "longDescription": "Fable-ous gives Codex an outcome-first, concise, proactive communication style while preserving safety, evidence, and authorization boundaries.",
-    "developerName": "BrightBoard AS",
+    "developerName": "Lars",
     "category": "Productivity",
     "capabilities": [
       "Interactive"

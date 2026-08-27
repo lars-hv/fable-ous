@@ -9,10 +9,11 @@ test("Opus launcher activates Fable-ous without user settings", () => {
   assert.equal(plan.env.FABLE_OUS_FORCE, "on");
 });
 
-test("Fable launcher always bypasses Fable-ous", () => {
+test("Fable launcher enables only the quiet-pulse profile", () => {
   const plan = claudeLaunchPlan(["--model=claude-fable-5", "-p", "Hei"]);
   assert.equal(plan.model, "claude-fable-5");
-  assert.equal(plan.env.FABLE_OUS_FORCE, "off");
+  assert.equal(plan.env.FABLE_OUS_FORCE, "on");
+  assert.equal(plan.env.FABLE_OUS_PROFILE, "quiet");
 });
 
 test("generic Claude launcher refuses to guess the model", () => {

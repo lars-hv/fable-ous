@@ -5,10 +5,18 @@ export const VOICE_CONTRACT = `Fable-ous communication contract:
 - Prefer one recommendation, one reason, and one exact next action.
 - Keep routine replies compact and natural. Expand only when evidence, risk, or the task requires it.
 - Mention tools, files, tests, and internal mechanics only when they materially change trust or the decision.
+- Treat client-generated tool receipts as sufficient. Never paraphrase "ran", "read", "wrote", shell counts, or the full list of active jobs.
+- During long work, give one short progress pulse only when a finding, risk, blocker, decision, or direction materially changes. Otherwise keep working quietly.
 - Ask only when the user owns a material decision; recommend a choice before asking.
 - Do not end with routine offers such as "shall I continue?" Finish the work or name the real blocker.
 - Never hide safety warnings, authorization boundaries, uncertainty, failed verification, or required evidence.
 - Exact-output requests override this style contract.`;
+
+export const QUIET_CONTRACT = `Fable-ous quiet-pulse contract for native Fable:
+- The client already shows tool receipts. Never paraphrase commands, reads, writes, shell counts, or the running job inventory.
+- Work quietly between receipts. Give one brief update only when a finding, risk, blocker, required decision, or direction materially changes.
+- Keep the routine final answer compact: result, proof, and any real risk or next action. Do not recap the full implementation or end with a routine offer.
+- Never hide a failed check, uncertainty, authorization boundary, missing proof, or completion risk.`;
 
 export function isExactOutputRequest(prompt = "") {
   return /\b(?:svar|returner|skriv|respond|return|write|output)\s+(?:kun|bare|only|exactly)\b|\bexact[- ]output\b/i.test(prompt);
@@ -19,7 +27,7 @@ export function allowsLongResponse(prompt = "") {
 }
 
 const MODE_CARDS = {
-  action: `This is an action request. Act before narrating. Keep visible updates to material findings, risks, blockers, or changed direction. The final answer should say what changed, what is proven, and the exact remaining action.`,
+  action: `This is an action request. Act before narrating. The client already shows tool receipts, so never restate commands, reads, writes, shell counts, or the running job inventory. Work quietly between receipts. Give one short pulse only when a finding, risk, blocker, required decision, critical path, or direction materially changes. The final answer should say what changed, what is proven, and the exact remaining action.`,
   correction: `The user is correcting or expressing frustration. Accept the correction plainly when valid, state the corrected understanding, and act on it. Do not defend the previous response or recap the whole exchange.`,
   decision: `This is a judgment request. Start with one clear recommendation and why it matters. Reject weak paths plainly. Put secondary tradeoffs after the recommendation.`,
   explain: `This is an explanation request. Answer the real question in plain language. Use technical names only when they help the user decide or verify something.`,
@@ -71,7 +79,7 @@ export function analyzeStyle(text = "") {
   if (/^(status|changed|verified|risk|next)\s*:/i.test(value)) {
     issues.push({ code: "template-first", severity: "high", message: "It opens with a fixed report label instead of a context-specific sentence." });
   }
-  if (/(?:would you like me to|shall i|let me know if you want|vil du at jeg|skal jeg|si ifra hvis du vil)[^.!?]*\??\s*$/i.test(value)) {
+  if (/(?:would you like me to|shall i|let me know if you want|if you want me to|vil du at jeg|skal jeg|si (?:i?fra|fra) (?:om|hvis) du vil)[^.!?]*[.!?]?\s*$/i.test(value)) {
     issues.push({ code: "optional-offer", severity: "high", message: "It ends with a routine offer or permission question." });
   }
 
@@ -81,7 +89,7 @@ export function analyzeStyle(text = "") {
   }
 
   const words = wordCount(value);
-  if (words > 160) {
+  if (words > 120) {
     issues.push({ code: "too-long", severity: "high", message: `It is ${words} words; routine replies should be selective.` });
   }
 

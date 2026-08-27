@@ -1,8 +1,10 @@
 # Fable-ous
 
-Fable-ous makes Codex and non-Fable Claude Code models communicate with more clarity, judgment, compression, and forward motion.
+Fable-ous makes Codex and Claude Code models communicate with more clarity, judgment, compression, and forward motion.
 
 It is built for people who want the agent to lead with the result, infer the likely goal, avoid process narration, continue through safe reversible work, and stop only at a real decision boundary.
+
+Its progress rule is a quiet pulse: the client may keep showing its normal tool receipts, while the model speaks only when a finding, risk, blocker, decision, or direction materially changes. It does not repeat shell counts or running-job inventories.
 
 Fable-ous is independent open-source software. It is not affiliated with, endorsed by, or derived from Anthropic or the Claude Fable model. The name describes the intended experience; it does not claim model equivalence.
 
@@ -22,7 +24,7 @@ fable-ous install
 
 Start a fresh Codex or Claude Code session after installation.
 
-Fable-ous is always active in Codex. In Claude Code, the SessionStart hook uses the model identifier when Claude provides it: it enables the contract for Opus, Sonnet, and other non-Fable models, and bypasses Fable. If Claude omits its model identifier, Fable-ous fails closed and stays off. The bundled Claude output style is available as a manual override but is not forced.
+Fable-ous is always active in Codex. In Claude Code, the SessionStart hook uses the model identifier when Claude provides it: Opus, Sonnet, and other non-Fable models receive the full communication contract. Native Fable receives only the small quiet-pulse contract, preserving its own voice while reducing duplicate progress narration. If Claude omits its model identifier, Fable-ous fails closed and stays off. The bundled Claude output style is available as a manual override but is not forced.
 
 Claude Code 2.1.246 omitted the optional `model` hook field in a real `--model claude-opus-5` run. For guaranteed no-settings activation, launch Opus through Fable-ous:
 
@@ -38,11 +40,11 @@ fable-ous fable
 fable-ous claude --model claude-sonnet-5
 ```
 
-The Fable launcher explicitly disables the layer. The generic launcher refuses to guess a model. If you change models inside Claude Code with `/model`, start a new wrapper session; later hooks do not reliably expose model changes.
+The Fable launcher explicitly selects the quiet-pulse profile; it does not add the renderer or full imitation contract. The generic launcher refuses to guess a model. If you change models inside Claude Code with `/model`, start a new wrapper session; later hooks do not reliably expose model changes.
 
 ### Strict mode
 
-Strict mode runs through the official Codex SDK. It buffers the raw Codex response, always renders a communication-only final pass, and shows only that final answer. Exact-output requests bypass the renderer.
+Strict mode runs through the official Codex SDK. It buffers the raw Codex response, always renders a communication-only final pass, and shows only that final answer. It may show a small number of deterministic milestone pulses for completed external research, file changes, or failed checks; raw model commentary and tool details stay hidden. Exact-output requests bypass the renderer.
 
 ```bash
 fable-ous strict --cwd /path/to/project
@@ -66,7 +68,7 @@ Claude Code includes `Concise` and `Proactive` output styles. Concise reduces pr
 
 ## Honest guarantees
 
-Fable-ous can deterministically guarantee activation in Codex, bypass when Claude reports a Fable model, one-pass Stop gating for measurable style failures, and hidden raw output in Codex strict mode. The strict renderer is read-only, so communication cleanup cannot alter the code patch.
+Fable-ous can deterministically guarantee activation in Codex, full-versus-quiet routing when Claude reports its model, one-pass Stop gating for measurable style failures on non-Fable models, and hidden raw output in Codex strict mode. The strict renderer is read-only, so communication cleanup cannot alter the code patch.
 
 It cannot guarantee identical model personality, suppress already-streamed commentary in ordinary Codex, detect every mid-session Claude model switch, or remain compatible with future client changes without updates. Public claims should be based on the included tests and versioned compatibility checks, not "works for everyone."
 
@@ -74,7 +76,7 @@ Verified locally with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Claude Cod
 
 The implementation follows the current official contracts for [Codex hooks](https://learn.chatgpt.com/docs/hooks), the [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [Claude Code hooks](https://code.claude.com/docs/en/hooks), and [Claude Code output styles](https://code.claude.com/docs/en/output-styles).
 
-See the dated [verification report](docs/VERIFICATION.md) for live-test evidence and known limits.
+See the dated [verification report](docs/VERIFICATION.md) for live-test evidence and known limits, and the [clean-route evaluation](docs/CLEAN-ROUTE-EVAL.md) for the cross-model quality gate.
 
 ## Commands
 

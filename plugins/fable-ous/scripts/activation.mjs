@@ -15,25 +15,26 @@ export function isFableModel(model = "") {
 }
 
 export function decideActivation({ input = {}, env = process.env } = {}) {
-  if (!isClaudeHost(env)) return { enabled: true, host: "codex", reason: "codex" };
+  if (env.FABLE_OUS_FORCE === "off") {
+    return { enabled: false, profile: "off", host: isClaudeHost(env) ? "claude" : "codex", model: "", reason: "forced-off" };
+  }
+
+  if (!isClaudeHost(env)) return { enabled: true, profile: "full", host: "codex", reason: "codex" };
 
   const model = String(input.model || env.FABLE_OUS_MODEL || env.ANTHROPIC_MODEL || "").trim();
   if (model) {
     return {
-      enabled: !isFableModel(model),
+      enabled: true,
+      profile: isFableModel(model) ? "quiet" : "full",
       host: "claude",
       model,
-      reason: isFableModel(model) ? "native-fable" : "non-fable-model"
+      reason: isFableModel(model) ? "native-fable-quiet" : "non-fable-model"
     };
-  }
-
-  if (env.FABLE_OUS_FORCE === "off") {
-    return { enabled: false, host: "claude", model: "", reason: "forced-off" };
   }
 
   // Claude may omit the model after /clear. Fail closed so Fable is never
   // accidentally restyled; a fresh model-bearing session enables other models.
-  return { enabled: false, host: "claude", model: "", reason: "unknown-model" };
+  return { enabled: false, profile: "off", host: "claude", model: "", reason: "unknown-model" };
 }
 
 function statePath(sessionId = "") {

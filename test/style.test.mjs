@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   analyzeStyle,
   classifyPrompt,
+  guidanceForPrompt,
   parseRenderedAnswer,
   shouldRevise
 } from "../plugins/fable-ous/scripts/style.mjs";
@@ -22,6 +23,11 @@ test("flags ritualized process-first communication", () => {
   assert.equal(shouldRevise(issues), true);
 });
 
+test("flags common routine commit offers", () => {
+  const issues = analyzeStyle("Testene passerer. Filen er ikke committet, si fra om du vil ha den inn.");
+  assert.equal(issues.some((issue) => issue.code === "optional-offer"), true);
+});
+
 test("flags fixed status templates", () => {
   const issues = analyzeStyle("Status: PATCH FIRST\nChanged: Nothing yet.");
   assert.equal(issues[0].code, "template-first");
@@ -33,8 +39,15 @@ test("accepts compact outcome-first prose", () => {
   assert.deepEqual(issues, []);
 });
 
+test("action guidance suppresses duplicate tool receipts but preserves material pulses", () => {
+  const guidance = guidanceForPrompt("Fiks dette og fortsett");
+  assert.match(guidance, /client already shows tool receipts/i);
+  assert.match(guidance, /one short pulse/i);
+  assert.match(guidance, /materially changes/i);
+});
+
 test("rewrites a long answer even when it has no other style failure", () => {
-  const issues = analyzeStyle(Array.from({ length: 161 }, () => "ord").join(" "));
+  const issues = analyzeStyle(Array.from({ length: 121 }, () => "ord").join(" "));
   assert.equal(issues[0].code, "too-long");
   assert.equal(shouldRevise(issues), true);
 });
