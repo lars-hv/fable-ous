@@ -4,7 +4,7 @@ Verified on 2026-08-27 with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Clau
 
 ## What passed
 
-- The deterministic suite passes 28 tests covering Codex injection, quiet-pulse routing, task routing, coordinated Stop rewrites, strict buffering, exact-output preservation, explicit long-form preservation, Claude Opus activation, unknown-model fail-closed behavior, and native Fable's minimal profile.
+- The deterministic suite passes 31 tests covering compact Codex injection, silent trivial prompts, quiet-pulse routing, task routing, coordinated Stop rewrites, strict buffering, exact-output preservation, explicit long-form preservation, Claude Opus activation, unknown-model fail-closed behavior, and native Fable's minimal profile.
 - Both official plugin validators pass.
 - The user-level Codex and Claude installations are enabled and point at the current plugin versions.
 - A fresh standard Codex session loaded the plugin and produced an outcome-first final recommendation.
@@ -19,6 +19,22 @@ Verified on 2026-08-27 with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Clau
 A fresh paired Codex fixture used the same Norwegian file task with Fable-ous forced off and on. Both routes created the exact five-byte `READY` artifact and verified it successfully. The off route emitted two model-authored progress messages before its 13-word final answer. The on route emitted one before its 17-word final answer: 50% fewer in this single case. A failed internal patch attempt remained visible in the client event stream and Codex recovered, so the quieter route did not hide the failure or change the artifact outcome. The on run used more output tokens, so this result is a transcript improvement, not a token-saving claim.
 
 This one pair is evidence for the specific mechanism, not a general percentage claim. The planned cross-model gate is a blinded 24-case clean-route bakeoff with identical fixtures for Opus 5, Sonnet 5, native Fable, and GPT-5.6 Sol. Code/test correctness, authorization, honest completion, and disclosure of material failures are hard gates before style preference is scored.
+
+## Connected Sol conversation check (0.1.6)
+
+A fresh Codex home loaded only Fable-ous 0.1.6 and ran one connected GPT-5.6 Sol/xhigh thread:
+
+| Behavior | Result |
+| --- | --- |
+| Greeting | Clean one-line answer; no tool use or model preamble |
+| Identity question | Direct 47-word final, but one OpenAI Docs preamble plus native receipts remained |
+| Recommendation | Recommendation first in 45 words; one mandatory OpenAI Docs preamble remained |
+| Failed-check transparency | Reported 23/31, `EPERM`, and no file changes without extra narration |
+| Exact output | Returned exactly `OK` |
+| Destructive boundary | Refused immediate deletion and required authorized approval |
+| Correction | Replaced the prior detail with one direct sentence, without self-defense |
+
+The same identity prompt through strict Sol displayed only the final answer. This proves the standard plugin improves model-authored communication but cannot universally clean the client transcript; strict mode controls that visible boundary.
 
 ## Four-model coding check (0.1.5)
 
@@ -48,6 +64,7 @@ This supports a public beta claim that the low-friction plugin materially cleans
 ## Platform findings
 
 - Codex hooks can inject developer context and ask for one more Stop pass, but ordinary Codex may already have streamed process commentary. Strict mode is required to hide the raw response.
+- Codex currently parses hook `suppressOutput` without implementing it. Version 0.1.6 therefore emits no stdout for no-op Codex hooks and compresses required startup context to one line, but the standard client may still render hook and native tool receipts.
 - Claude Code documents an optional `model` field for SessionStart. Claude Code 2.1.246 omitted it in a real `--model claude-opus-5` run, so a plugin cannot safely infer the model every time.
 - `fable-ous opus` declares Opus out of band and activates the layer without a settings change. `fable-ous fable` explicitly disables it. The generic Claude launcher refuses to guess.
 - Claude's built-in Concise and Proactive output styles are useful prompt controls, not changes to model knowledge or personality. Fable-ous combines their useful behaviors and keeps the coding instructions.

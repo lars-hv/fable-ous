@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   analyzeStyle,
   classifyPrompt,
+  compactGuidanceForPrompt,
   guidanceForPrompt,
+  isTrivialPrompt,
   parseRenderedAnswer,
   shouldRevise
 } from "../plugins/fable-ous/scripts/style.mjs";
@@ -44,6 +46,23 @@ test("action guidance suppresses duplicate tool receipts but preserves material 
   assert.match(guidance, /client already shows tool receipts/i);
   assert.match(guidance, /one short pulse/i);
   assert.match(guidance, /materially changes/i);
+});
+
+test("recognizes greetings, identity questions, thanks, and small talk", () => {
+  for (const prompt of ["hei", "Hvem er du?", "How are you?", "Tusen takk!"]) {
+    assert.equal(isTrivialPrompt(prompt), true, prompt);
+    assert.equal(compactGuidanceForPrompt(prompt), "", prompt);
+  }
+  assert.equal(isTrivialPrompt("Fiks testen"), false);
+});
+
+test("Codex guidance is selective, compact, and example-free", () => {
+  assert.equal(compactGuidanceForPrompt("Dette er bare en vanlig setning."), "");
+  const guidance = compactGuidanceForPrompt("Fiks dette og fortsett");
+  assert.match(guidance, /Act before narrating/);
+  assert.match(guidance, /proof state materially changes/);
+  assert.doesNotMatch(guidance, /Example voice/);
+  assert.equal(guidance.includes("\n"), false);
 });
 
 test("rewrites a long answer even when it has no other style failure", () => {
