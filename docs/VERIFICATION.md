@@ -1,69 +1,45 @@
 # Fable-ous verification
 
-Candidate 0.2.2 was tested on 2026-08-28 with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Claude Code 2.1.246, Node.js 24.16.0, and macOS.
+Candidate 0.2.3 was prepared on 2026-08-28 with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Claude Code 2.1.246, Node.js 24.16.0, and macOS.
+
+## Current architecture boundary
+
+Fable-ous is a communication layer. Focus Mode performs exactly one normal working-model turn and returns its latest natural final answer. It does not request a structured state envelope, auto-continue the thread, classify command failures, append caveats, disable hooks, or run a renderer model.
+
+The working Codex model keeps its normal tools, plugins, lifecycle hooks, safety rules, approval boundaries, and coding workflow. Focus Mode buffers routine commentary and tool mechanics from the visible terminal. A real SDK turn failure exits as an error. Whether code is correct or work is complete remains the responsibility of Codex and the host's existing controls, not a second Fable-ous controller.
 
 ## Deterministic evidence
 
-- `npm run check`: 43 passing tests, 0 failures.
-- `bun test test/fable-ous-boundary.proof.test.ts`: 2 passing proof tests, 7 assertions.
-- The Codex and Claude plugin validators pass.
-- `npm audit`: 0 vulnerabilities.
-- `git diff --check`: clean.
-- The standard installer recognizes an existing strong global Codex contract without duplicating it and upgrades an older managed block in place.
-- An isolated Claude 0.2.0 to 0.2.1 reproduction proved that `plugin install` was a successful no-op for existing users. The installer now selects `plugin update`; the same isolated boundary then updated the active cache to 0.2.1. The final 0.2.2 path uses that corrected mechanism.
-- With the durable marker active, Codex SessionStart emits zero bytes. UserPromptSubmit and Stop hooks are absent from the manifest.
-- The installer block is idempotent and removable without changing surrounding user instructions.
-- No prompt or response is written to Fable-ous session state; the old session-state mechanism is deleted.
-- Claude forces the Fable-ous output style for every model, preserves coding instructions, and emits zero Fable-ous hook text.
-- Strict uses one working Codex thread and the SDK output schema. It has no renderer thread and disables lifecycle hooks only inside its child process.
-- Strict hides raw commentary and successful tool mechanics, continues the same thread for at most three hidden rounds, stops at authorization boundaries, fails closed on invalid structured output, and appends unresolved material disclosures.
-- A red verification command is cleared when a later compatible command proves recovery. Only `rg`/`grep` no-match discovery with exit code 1 is ignored; every other failed command blocks `done`. This includes missing evidence reads, semantic Git diff exits, `git diff --check`, dependency audits, type checks, and plugin validators.
+- The complete Node test and syntax suite passes: 34/34 tests.
+- The Bun customer-boundary proof passes: 2/2 tests with 8 assertions.
+- Both plugin validators pass.
+- `npm audit` reports zero vulnerabilities.
+- `git diff --check` is clean.
+- Focus Mode is the default CLI route; `strict` remains a backwards-compatible alias.
+- The publish gate runs the complete check, both plugin validators, and a package-content allowlist before npm can publish.
+- Tests prove that Focus calls the working model once without an output schema, ignores raw command and file events, returns the latest natural model message unchanged, preserves authorization language, and surfaces real turn failures.
+- Tests prove that Fable-ous does not override Codex features, hooks, sandbox, or approval defaults and that its installed communication contract explicitly leaves coding workflow and completion judgment to the host.
+- The installer upgrades an older managed instruction block in place, remains idempotent, and removes only its own block on uninstall.
+- Codex has no per-prompt or Stop hook. Claude forces the Fable-ous output style while preserving coding instructions.
 
-## Live GPT-5.6 Sol/xhigh evidence
+The packed 0.2.3 candidate was installed without `npm link` into isolated Codex roots. Doctor reported the durable style active and per-turn hooks silent; the installed plugin cache was byte-identical to the packed plugin source. The npm publish dry-run contained 23 allowlisted files and preserved the public CLI binary.
 
-Three synthetic strict-mode checks completed successfully:
+## Live model evidence
 
-1. A platform-before-payment question returned one recommendation, one reason, and one next action in 47 words.
-2. `Svar kun med ordet OK.` returned exactly `OK`.
-3. A production-customer-data deletion prompt deleted nothing, refused the requested `DELETED` success literal, and required an exact authorized target and recovery point.
+Earlier GPT-5.6 Sol development runs proved that the style could produce concise, outcome-first answers and that Sol could move the synthetic coding fixture from 1/4 to 4/4 without changing its test file. Those runs also exposed the decisive design flaw in the earlier controller: Fable-ous sometimes appended a false failure caveat after Sol had recovered a red test and reached 4/4.
 
-A fourth repository-status check correctly refused a publish claim. It surfaced that read-only sandboxing blocked six tests, identified stale verification documentation, and noted that `private: true` blocks npm publication. Strict exposed the failed check instead of converting it into success.
+Candidate 0.2.3 removes that controller mechanism instead of adding more command-classification patches. A fresh packed-candidate Sol style probe returned one direct recommendation, one reason, and one concrete next action in three short paragraphs.
 
-The isolated strict coding fixture began at 1/4 tests. The first release-line run exposed Maestro lifecycle-hook interference; strict was then isolated from hooks. A second run exposed a false failure receipt when a red `npm test` was recovered inside a larger green command. After both mechanism fixes, GPT-5.6 Sol returned one clean 30-word final, host-side re-verification passed 4/4, and the test-file SHA-256 remained `2bf12d36220ca5628fc004f6786149f1d80a500151312132f6cda6d588d956c2`.
+On the tracked synthetic coding fixture, packed-candidate Sol moved from 1/4 to 4/4 and preserved the test-file SHA-256 `2bf12d36220ca5628fc004f6786149f1d80a500151312132f6cda6d588d956c2`. Its natural final also reported that Maestro could not persist an external receipt from the configured workspace sandbox. Focus returned that host judgment unchanged; it neither hid the blocker nor appended its own caveat. This is a host-integration limitation, not a failed code oracle.
 
-## Live Opus 5 evidence
+No native Fable run is part of this release gate.
 
-The same 1/4 coding fixture revealed the cross-plugin boundary. With Lars's full Claude plugin stack, Opus fixed the code but was pulled into a Maestro Stop-hook investigation: 24 turns, more than five minutes, and about $1.47 before the run was stopped. This is a real standard-mode conflict that Fable-ous cannot override from an output style.
-
-With local settings plus only the exact Fable-ous plugin directory, Opus 5 completed the same task in 15 seconds and four turns for about $0.15. Its final was concise, host verification passed 4/4, and the test-file SHA-256 was unchanged. This route is exposed as `fable-ous opus --clean`.
-
-## Limited native Fable evidence
-
-Only two short decision probes were run. Adding the explicit 40–100 word / three-paragraph budget reduced output from 646 to 308 output tokens while preserving the recommendation, reason, and next action. The second response was still near the upper length boundary, so this is improvement evidence, not a universal brevity guarantee.
-
-A single matching Sonnet 5 probe completed in one turn with 219 output tokens, three short paragraphs, no process narration, and the direct recommendation first. It was a style smoke test, not a coding gate.
-
-## Native Codex boundary
-
-A fresh Codex 0.150.1 session used GPT-5.6 Sol/xhigh with installed 0.2.2 active. Fable-ous SessionStart produced zero bytes, no Fable-ous hook contract or prompt context remained in the transcript, and the greeting probe received only `Hei, Lars! Hva skal vi få gjort i dag?`. Codex still owns its transient `Working` UI and may show receipts from other installed plugins.
-
-## Code-quality boundary
-
-Fable-ous changes communication and presentation only. The strict final schema is applied to the same Codex thread that performs the work; no second model edits code or rewrites completion state. GPT-5.6 Sol and clean-route Opus 5 both reached the same host-verified 4/4 result without changing tests. The older four-model development fixture remains supporting evidence, not a current release gate.
+Historical Opus and native-Fable experiments remain development context only. They are not proof of the current 0.2.3 Focus boundary and are not required for publication.
 
 ## Platform boundary
 
-OpenAI's current hook documentation says `suppressOutput` is parsed but not implemented. Fable-ous therefore cannot promise that ordinary Codex will hide native receipts. Its installer moves the style contract into Codex's durable instruction stack so Fable-ous itself does not need repeated visible hook text. Strict mode owns the visible stream and turns off lifecycle hooks only for that child process when a clean transcript is required.
+OpenAI's standard Codex interface owns its native tool receipts, so the durable instruction layer cannot guarantee a receipt-free standard session. Focus Mode can hide those mechanics because it owns its own terminal presentation, but it intentionally does not suppress or disable the underlying hooks and plugins.
 
-Claude's forced output style is automatic and model-independent, but another plugin's Stop hook has higher control over task continuation. The optional `--clean` route removes that collision for the launched process while keeping authentication and built-in coding tools. It also omits user/project settings, including permissions, MCP servers, and hooks defined there, so it remains an explicit opt-in rather than the default.
-
-## Installed release evidence
-
-- Independent follow-up review returned GO on the exact production/control diff after two fail-closed command-boundary fixes.
-- Commit `6145ce52d2d4082498f5c8330c21674f88a41826` is installed as Codex `0.2.2+codex.20260828082340` and Claude `0.2.2`; both active plugin directories are byte-identical to the committed source plugin directory.
-- Installed Fable-ous SessionStart and prompt-hook probes emit zero bytes with the durable Codex layer active.
-- A fresh ordinary GPT-5.6 Sol/xhigh session returned only `Hei, Lars! Hva skal vi få gjort i dag?`, without Fable-ous hook context or dialogs.
-- A fresh installed strict-mode Sol fixture moved from 1/4 to 4/4 in 21 seconds, preserved the test-file SHA-256, and returned only `Fikset. Alle 4 testene passerer.`
-- Installed clean-route Opus 5 completed a decision probe in one turn for about $0.10 with the recommendation first and three short paragraphs. The same prompt with the full user plugin stack took 10 turns and about $0.74, confirming that `--clean` is effective but not safely interchangeable with settings-dependent workflows.
+Claude's forced output style is automatic and model-independent, but it cannot cancel another plugin's hooks. The optional `--clean` route isolates the launched Claude process and therefore also omits user/project settings, including permissions, MCP servers, and safety hooks defined there. It remains an explicit opt-in.
 
 The project does not claim identical Fable personality, universal preference, or compatibility with every future Codex and Claude Code release. A strong public effectiveness claim still requires the blinded holdout defined in `docs/CLEAN-ROUTE-EVAL.md`.

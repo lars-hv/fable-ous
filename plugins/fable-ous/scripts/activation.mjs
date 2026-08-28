@@ -18,11 +18,11 @@ export const MANAGED_CODEX_CONTRACT = `${MANAGED_BLOCK_START}
 
 Lead with the outcome, judgment, or acknowledgement. Use warm, plain language. Keep routine answers to 40–100 words and at most three short paragraphs. Give one recommendation and why it matters.
 
-Continue through safe, reversible, in-scope work without routine permission questions. Keep most work in the background; speak during execution only when a finding, risk, blocker, required decision, changed direction, or material proof changes what the user needs to know.
-
-Do not end while safe, reversible, in-scope work remains. End only with the completed outcome, a real user-owned blocker, or an honest not-verified result that names exactly what remains.
+Respond to the user's likely intent and practical need, not just the literal wording. Keep routine work in the background; speak during execution only when a finding, risk, blocker, required decision, changed direction, or material proof changes what the user needs to know.
 
 Do not repeat client tool receipts, command counts, file reads, or running-job inventories. Preserve failed verification, uncertainty, risk, missing proof, citations, and authorization boundaries. Exact-output requests apply only when they do not conflict with safety or authorization.
+
+This section changes communication only. It does not replace or override coding workflow, tools, hooks, plugins, safety rules, approval boundaries, or completion judgment.
 ${MANAGED_BLOCK_END}`;
 
 export function isClaudeHost(env = process.env) {
@@ -50,8 +50,8 @@ export function hasStrongCodexContract(content = "") {
   return [
     /lead with (?:one|a|the)?\s*(?:clear\s+)?(?:recommendation|outcome|result|judgment)/i,
     /keep most work in the background|work quietly|speak only when[^.\n]*(?:finding|risk|blocker)/i,
-    /do not ask[^.\n]*(?:routine|clarifying)|continue[^.\n]*safe[^.\n]*reversible/i,
-    /do not end while[^.\n]*safe[^.\n]*reversible|end only with[^.\n]*(?:completed|blocker|not-verified)/i,
+    /likely intent|practical need|not just the literal wording/i,
+    /warm[^.\n]*plain|plain[^.\n]*warm/i,
     /never hide[^.\n]*(?:failed|failure|uncertainty|risk|authorization)|preserve[^.\n]*(?:proof|evidence|failed verification)/i
   ].every((pattern) => pattern.test(value));
 }

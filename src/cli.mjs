@@ -16,9 +16,9 @@ import { createStrictSession, runStrictTurn } from "./strict.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const args = [...argv];
-  const command = args[0] && !args[0].startsWith("-") ? args.shift() : "strict";
+  const command = args[0] && !args[0].startsWith("-") ? args.shift() : "focus";
   const options = { _: [] };
   while (args.length) {
     const value = args.shift();
@@ -121,7 +121,7 @@ async function askOnce(prompt, options) {
 async function interactive(options) {
   const session = createStrictSession(strictOptions(options));
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
-  process.stdout.write("Fable-ous · clean  (/exit to quit)\n\n");
+  process.stdout.write("Fable-ous · Focus Mode  (/exit to quit)\n\n");
   try {
     while (true) {
       const prompt = (await terminal.question("› ")).trim();
@@ -191,7 +191,9 @@ function install(options) {
     const installed = execFileSync("claude", ["plugin", "list", "--json"], { encoding: "utf8" });
     run("claude", claudeInstallPlan(installed));
   }
-  process.stdout.write(`Fable-ous installed. Codex style source: ${style.source}. Start a fresh session.\n`);
+  process.stdout.write(
+    `Fable-ous installed. Codex style source: ${style.source}. Focus Mode is the default: run fable-ous in a fresh terminal.\n`
+  );
 }
 
 function styleOff() {
@@ -250,7 +252,7 @@ async function lint() {
 }
 
 function help() {
-  process.stdout.write(`Fable-ous\n\nCommands:\n  fable-ous install [--codex-only]\n  fable-ous style-off\n  fable-ous doctor\n  fable-ous strict [--cwd PATH] [--model MODEL] [--effort LEVEL]\n  fable-ous ask "PROMPT" [--cwd PATH] [--model MODEL]\n  fable-ous opus [--clean] [...CLAUDE_ARGS]\n  fable-ous fable [--clean] [...CLAUDE_ARGS]\n  fable-ous claude --model MODEL [--clean] [...CLAUDE_ARGS]\n  fable-ous lint < response.txt\n`);
+  process.stdout.write(`Fable-ous\n\nFocus Mode:\n  fable-ous [--cwd PATH] [--model MODEL] [--effort LEVEL]\n  fable-ous focus [--cwd PATH] [--model MODEL] [--effort LEVEL]\n\nCommands:\n  fable-ous install [--codex-only]\n  fable-ous style-off\n  fable-ous doctor\n  fable-ous strict [--cwd PATH] [--model MODEL] [--effort LEVEL]  (legacy alias)\n  fable-ous ask "PROMPT" [--cwd PATH] [--model MODEL]\n  fable-ous opus [--clean] [...CLAUDE_ARGS]\n  fable-ous fable [--clean] [...CLAUDE_ARGS]\n  fable-ous claude --model MODEL [--clean] [...CLAUDE_ARGS]\n  fable-ous lint < response.txt\n`);
 }
 
 export async function main(argv) {
@@ -267,7 +269,7 @@ export async function main(argv) {
     if (!prompt) throw new Error("Provide a prompt after `fable-ous ask`.");
     return askOnce(prompt, options);
   }
-  if (command === "strict") return interactive(options);
+  if (command === "focus" || command === "strict") return interactive(options);
   if (command === "help" || command === "--help" || command === "-h") return help();
   throw new Error(`Unknown command: ${command}`);
 }

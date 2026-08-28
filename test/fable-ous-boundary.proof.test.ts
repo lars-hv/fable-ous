@@ -23,18 +23,14 @@ test("Codex per-turn hooks emit no visible body", () => {
   expect(stop.stdout).toBe("");
 });
 
-test("strict returns the working model final without invoking a renderer", async () => {
+test("Focus returns one natural working-model final without a controller or renderer", async () => {
+  const calls: unknown[][] = [];
   const result = await runStrictTurn({
     mainThread: {
-      run: async () => ({
-        finalResponse: JSON.stringify({
-          state: "done",
-          answer: "Direkte svar.",
-          next_action: "",
-          material_disclosures: []
-        }),
-        usage: null
-      })
+      run: async (...args: unknown[]) => {
+        calls.push(args);
+        return { finalResponse: "Direkte svar.", usage: null };
+      }
     },
     createRendererThread: () => {
       throw new Error("renderer must not be created");
@@ -44,5 +40,6 @@ test("strict returns the working model final without invoking a renderer", async
 
   expect(result.answer).toBe("Direkte svar.");
   expect(result.revised).toBe(false);
-  expect(claudeLaunchPlan(["--model=claude-fable-5"]).env).toEqual({});
+  expect(calls).toEqual([["Svar direkte."]]);
+  expect(claudeLaunchPlan(["--model=claude-opus-5"]).env).toEqual({});
 });

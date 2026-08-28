@@ -74,5 +74,6 @@ test("Claude output style is forced for every model and preserves coding instruc
   assert.match(style, /^force-for-plugin:\s*true$/m);
   assert.match(style, /^keep-coding-instructions:\s*true$/m);
   assert.match(style, /40[–-]100 words/i);
-  assert.match(style, /Do not end while safe, reversible, in-scope work remains/i);
+  assert.match(style, /changes communication only/i);
+  assert.doesNotMatch(style, /continue through safe|do not end while/i);
 });
