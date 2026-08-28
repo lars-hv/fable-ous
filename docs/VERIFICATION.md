@@ -45,7 +45,7 @@ A single matching Sonnet 5 probe completed in one turn with 219 output tokens, t
 
 ## Native Codex boundary
 
-A fresh Codex 0.150.1 TUI session used GPT-5.6 Sol/xhigh with the 0.2.0 candidate active. Fable-ous SessionStart produced zero bytes, no Fable-ous hook contract or prompt context remained in the transcript, and `hei` received the concise final `Hei Lars! Hva skal vi få gjort?`. Codex still owns its transient `Working` UI and may show receipts from other installed plugins.
+A fresh Codex 0.150.1 session used GPT-5.6 Sol/xhigh with installed 0.2.2 active. Fable-ous SessionStart produced zero bytes, no Fable-ous hook contract or prompt context remained in the transcript, and the greeting probe received only `Hei, Lars! Hva skal vi få gjort i dag?`. Codex still owns its transient `Working` UI and may show receipts from other installed plugins.
 
 ## Code-quality boundary
 
@@ -55,11 +55,15 @@ Fable-ous changes communication and presentation only. The strict final schema i
 
 OpenAI's current hook documentation says `suppressOutput` is parsed but not implemented. Fable-ous therefore cannot promise that ordinary Codex will hide native receipts. Its installer moves the style contract into Codex's durable instruction stack so Fable-ous itself does not need repeated visible hook text. Strict mode owns the visible stream and turns off lifecycle hooks only for that child process when a clean transcript is required.
 
-Claude's forced output style is automatic and model-independent, but another plugin's Stop hook has higher control over task continuation. The optional `--clean` route removes that collision for the launched process while keeping authentication and built-in coding tools.
+Claude's forced output style is automatic and model-independent, but another plugin's Stop hook has higher control over task continuation. The optional `--clean` route removes that collision for the launched process while keeping authentication and built-in coding tools. It also omits user/project settings, including permissions, MCP servers, and hooks defined there, so it remains an explicit opt-in rather than the default.
 
-## Remaining release gates
+## Installed release evidence
 
-- Obtain a clean independent P1 review on the exact candidate.
-- Commit the reviewed bytes, install that exact candidate, and prove the active cache version.
+- Independent follow-up review returned GO on the exact production/control diff after two fail-closed command-boundary fixes.
+- Commit `6145ce52d2d4082498f5c8330c21674f88a41826` is installed as Codex `0.2.2+codex.20260828082340` and Claude `0.2.2`; both active plugin directories are byte-identical to the committed source plugin directory.
+- Installed Fable-ous SessionStart and prompt-hook probes emit zero bytes with the durable Codex layer active.
+- A fresh ordinary GPT-5.6 Sol/xhigh session returned only `Hei, Lars! Hva skal vi få gjort i dag?`, without Fable-ous hook context or dialogs.
+- A fresh installed strict-mode Sol fixture moved from 1/4 to 4/4 in 21 seconds, preserved the test-file SHA-256, and returned only `Fikset. Alle 4 testene passerer.`
+- Installed clean-route Opus 5 completed a decision probe in one turn for about $0.10 with the recommendation first and three short paragraphs. The same prompt with the full user plugin stack took 10 turns and about $0.74, confirming that `--clean` is effective but not safely interchangeable with settings-dependent workflows.
 
 The project does not claim identical Fable personality, universal preference, or compatibility with every future Codex and Claude Code release. A strong public effectiveness claim still requires the blinded holdout defined in `docs/CLEAN-ROUTE-EVAL.md`.

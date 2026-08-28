@@ -56,7 +56,7 @@ If another Claude plugin's hooks keep reopening or narrating the task, use the c
 fable-ous opus --clean
 ```
 
-`--clean` starts Claude with local settings plus the exact Fable-ous plugin directory, omitting user/project plugin settings for that process. Authentication and Claude's built-in coding tools remain. This is an explicit isolation mode; standard launchers preserve the user's normal plugin stack.
+`--clean` starts Claude with local settings plus the exact Fable-ous plugin directory. Authentication and Claude's built-in coding tools remain, but user/project settings are intentionally omitted — including permissions, MCP servers, and safety hooks defined there. Use it only when that isolation is acceptable; standard launchers preserve the user's normal plugin stack and safety controls.
 
 ### Strict mode
 
