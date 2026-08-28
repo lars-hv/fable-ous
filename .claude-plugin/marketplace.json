@@ -10,7 +10,7 @@
       "displayName": "Fable-ous",
       "source": "./plugins/fable-ous",
       "description": "Make Codex and Claude Code communicate with clarity, judgment, and less process narration.",
-      "version": "0.2.0",
+      "version": "0.2.2",
       "author": {
         "name": "Lars"
       },

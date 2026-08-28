@@ -2,8 +2,8 @@
 
 import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { decideActivation, isClaudeHost, isCodexStyleLayerActive } from "./activation.mjs";
-import { CODEX_START_CONTRACT, QUIET_CONTRACT, VOICE_CONTRACT } from "./style.mjs";
+import { isClaudeHost, isCodexStyleLayerActive } from "./activation.mjs";
+import { CODEX_START_CONTRACT } from "./style.mjs";
 
 async function readInput() {
   let data = "";
@@ -25,19 +25,15 @@ export function handleHook({ mode, input = {}, env = process.env } = {}) {
   // deliberately removed: they made the transcript noisier and created unsafe
   // state/rewrite boundaries without improving the coding work.
   if (mode !== "session-start") return null;
-
-  const activation = decideActivation({ input, env });
-  if (!activation.enabled) return isClaudeHost(env) ? { continue: true } : null;
-  if (!isClaudeHost(env) && isCodexStyleLayerActive({ env })) return null;
+  // Claude's forced output style is quieter and model-independent. The hook
+  // therefore emits nothing for Opus, Sonnet, Fable, or an unknown model.
+  if (isClaudeHost(env)) return null;
+  if (env.FABLE_OUS_FORCE === "off" || isCodexStyleLayerActive({ env })) return null;
 
   return {
     hookSpecificOutput: {
       hookEventName: "SessionStart",
-      additionalContext: activation.profile === "quiet"
-        ? QUIET_CONTRACT
-        : isClaudeHost(env)
-          ? VOICE_CONTRACT
-          : CODEX_START_CONTRACT
+      additionalContext: CODEX_START_CONTRACT
     }
   };
 }

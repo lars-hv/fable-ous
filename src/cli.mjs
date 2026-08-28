@@ -8,7 +8,6 @@ import { fileURLToPath } from "node:url";
 import {
   ensureCodexStyleLayer,
   isCodexStyleLayerActive,
-  isFableModel,
   removeCodexStyleLayer
 } from "../plugins/fable-ous/scripts/activation.mjs";
 import { handleHook } from "../plugins/fable-ous/scripts/hook.mjs";
@@ -45,7 +44,8 @@ function run(command, args) {
 }
 
 export function claudeLaunchPlan(args = [], defaultModel = "") {
-  const forwarded = [...args];
+  const clean = args.includes("--clean");
+  const forwarded = args.filter((value) => value !== "--clean");
   let model = "";
   const modelIndex = forwarded.findIndex((value) => value === "--model");
   const inlineModel = forwarded.find((value) => value.startsWith("--model="));
@@ -61,15 +61,31 @@ export function claudeLaunchPlan(args = [], defaultModel = "") {
     throw new Error("Pass --model explicitly, or use `fable-ous opus` / `fable-ous fable`. Fable-ous will not guess on Claude.");
   }
 
+  if (clean) {
+    forwarded.unshift("--setting-sources", "local", "--plugin-dir", resolve(ROOT, "plugins/fable-ous"));
+  }
+
   return {
     args: forwarded,
     model,
-    env: {
-      FABLE_OUS_MODEL: model,
-      FABLE_OUS_FORCE: "on",
-      FABLE_OUS_PROFILE: isFableModel(model) ? "quiet" : "full"
-    }
+    clean,
+    env: {}
   };
+}
+
+export function claudeInstallPlan(pluginListJson = "[]") {
+  let plugins = [];
+  try {
+    const parsed = JSON.parse(String(pluginListJson || "[]"));
+    if (Array.isArray(parsed)) plugins = parsed;
+  } catch {
+    // A malformed list is treated as a first install; Claude will report a
+    // concrete error instead of letting Fable-ous claim a successful upgrade.
+  }
+  const installed = plugins.some((plugin) => plugin?.id === "fable-ous@fable-ous");
+  return installed
+    ? ["plugin", "update", "fable-ous@fable-ous", "--scope", "user"]
+    : ["plugin", "install", "fable-ous@fable-ous", "--scope", "user"];
 }
 
 function launchClaude(args, defaultModel = "") {
@@ -172,7 +188,8 @@ function install(options) {
   if (!options["codex-only"] && commandExists("claude")) {
     run("claude", ["plugin", "validate", pluginRoot]);
     run("claude", ["plugin", "marketplace", "add", ROOT]);
-    run("claude", ["plugin", "install", "fable-ous@fable-ous", "--scope", "user"]);
+    const installed = execFileSync("claude", ["plugin", "list", "--json"], { encoding: "utf8" });
+    run("claude", claudeInstallPlan(installed));
   }
   process.stdout.write(`Fable-ous installed. Codex style source: ${style.source}. Start a fresh session.\n`);
 }
@@ -233,7 +250,7 @@ async function lint() {
 }
 
 function help() {
-  process.stdout.write(`Fable-ous\n\nCommands:\n  fable-ous install [--codex-only]\n  fable-ous style-off\n  fable-ous doctor\n  fable-ous strict [--cwd PATH] [--model MODEL] [--effort LEVEL]\n  fable-ous ask "PROMPT" [--cwd PATH] [--model MODEL]\n  fable-ous opus [...CLAUDE_ARGS]\n  fable-ous fable [...CLAUDE_ARGS]\n  fable-ous claude --model MODEL [...CLAUDE_ARGS]\n  fable-ous lint < response.txt\n`);
+  process.stdout.write(`Fable-ous\n\nCommands:\n  fable-ous install [--codex-only]\n  fable-ous style-off\n  fable-ous doctor\n  fable-ous strict [--cwd PATH] [--model MODEL] [--effort LEVEL]\n  fable-ous ask "PROMPT" [--cwd PATH] [--model MODEL]\n  fable-ous opus [--clean] [...CLAUDE_ARGS]\n  fable-ous fable [--clean] [...CLAUDE_ARGS]\n  fable-ous claude --model MODEL [--clean] [...CLAUDE_ARGS]\n  fable-ous lint < response.txt\n`);
 }
 
 export async function main(argv) {

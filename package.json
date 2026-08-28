@@ -1,6 +1,6 @@
 {
   "name": "fable-ous",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Outcome-first communication layer for Codex and Claude Code.",
   "author": "Lars",
   "repository": {

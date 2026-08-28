@@ -62,21 +62,17 @@ test("Codex can be forced off without producing a receipt body", () => {
   assert.equal(runHookRaw("session-start", { source: "startup" }, { FABLE_OUS_FORCE: "off" }), "");
 });
 
-test("Claude Fable receives only the quiet-pulse contract", () => {
+test("Claude hooks stay silent because the forced output style owns communication", () => {
   const env = { CLAUDE_PLUGIN_ROOT: "/tmp/fable-ous", PLUGIN_ROOT: "" };
-  const output = runHook("session-start", { source: "startup", model: "claude-fable-5" }, env);
-  assert.match(output.hookSpecificOutput.additionalContext, /quiet-pulse contract/i);
-  assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /Prefer one recommendation/i);
+  assert.equal(runHookRaw("session-start", { source: "startup", model: "claude-fable-5" }, env), "");
+  assert.equal(runHookRaw("session-start", { source: "startup", model: "claude-opus-5" }, env), "");
+  assert.equal(runHookRaw("session-start", { source: "clear" }, env), "");
 });
 
-test("Claude Opus receives the full session contract", () => {
-  const env = { CLAUDE_PLUGIN_ROOT: "/tmp/fable-ous", PLUGIN_ROOT: "" };
-  const output = runHook("session-start", { source: "startup", model: "claude-opus-5" }, env);
-  assert.match(output.hookSpecificOutput.additionalContext, /Lead with the outcome/);
-});
-
-test("Claude with an unknown model fails closed", () => {
-  const env = { CLAUDE_PLUGIN_ROOT: "/tmp/fable-ous", PLUGIN_ROOT: "" };
-  const output = runHook("session-start", { source: "clear" }, env);
-  assert.equal(output.continue, true);
+test("Claude output style is forced for every model and preserves coding instructions", () => {
+  const style = readFileSync(new URL("../plugins/fable-ous/output-styles/fable-ous.md", import.meta.url), "utf8");
+  assert.match(style, /^force-for-plugin:\s*true$/m);
+  assert.match(style, /^keep-coding-instructions:\s*true$/m);
+  assert.match(style, /40[–-]100 words/i);
+  assert.match(style, /Do not end while safe, reversible, in-scope work remains/i);
 });

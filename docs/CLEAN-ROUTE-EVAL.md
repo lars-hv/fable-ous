@@ -4,9 +4,10 @@ The target is not merely shorter text. The target is an effortless route: the ag
 
 ## Model profiles
 
-- Codex, Opus, Sonnet, and other non-Fable models receive the full Fable-ous contract.
-- Native Fable keeps its own voice and receives only the quiet-pulse contract.
-- Codex strict mode buffers raw model commentary, uses an in-place activity indicator, and persists only material failure pulses before the working model's structured final answer.
+- Codex receives the durable Fable-ous contract after installation.
+- Claude Code forces the same output style for Opus, Sonnet, native Fable, and other models while preserving coding instructions.
+- Codex strict mode buffers raw model commentary, uses an in-place activity indicator, persists only material failure pulses, and continues the same working thread when it reports that safe in-scope work remains.
+- Claude `--clean` runs with local settings plus only the exact Fable-ous plugin when another plugin's hooks otherwise dominate the conversation.
 
 Fable-ous stays a communication layer. It does not route subtasks to cheaper models, change coding instructions, or trade implementation quality for fewer tokens.
 
@@ -45,4 +46,6 @@ A strong improvement claim requires 100% hard-gate pass, at least 70% pairwise p
 
 Version 0.1.5 passed one matched coding oracle on all four models: every route reached 4/4 host-verified tests without changing the test file. Opus and native Fable each emitted one progress message. With only Fable-ous enabled, Sonnet emitted no progress prose and Sol emitted one message before the final. Lars's full Maestro/Superpowers setup remained noisy in standard Sonnet/Sol.
 
-The 0.2.0 candidate removes per-prompt and Stop hooks, moves standard Codex style into a reversible durable instruction block, and deletes the strict renderer. Three live strict Sol/xhigh checks passed recommendation-first style, exact `OK`, and the destructive authorization boundary. A repository-status check also surfaced a sandbox-blocked test and refused a ship claim. This is still development evidence; the full blinded holdout remains the public effectiveness gate.
+The 0.2.2 candidate removes per-prompt and Stop hooks, moves standard Codex style into a reversible durable instruction block, forces Claude's native output style without hook text, and has no strict renderer. Clean-closure tests prove that intermediate receipts stay hidden, recovered checks do not leak as failures, authorization stops continuation, blocking disclosures cannot become `done`, and a bounded continuation failure remains honest.
+
+Live coding gates passed on GPT-5.6 Sol strict and Opus 5 clean: both reached 4/4 without changing tests and returned compact finals. The same Opus task under Lars's full plugin stack was dominated by Maestro for 24 turns and had to be stopped, proving that standard output styles cannot overrule another plugin's Stop hook. A one-turn Sonnet style probe was clean and compact. The explicit Fable word budget cut one matched native-Fable response from 646 to 308 output tokens. These are development results; the full blinded holdout remains the public effectiveness gate.

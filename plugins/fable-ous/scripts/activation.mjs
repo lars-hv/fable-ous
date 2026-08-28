@@ -16,39 +16,17 @@ export const MANAGED_BLOCK_END = "<!-- fable-ous:codex-style:end -->";
 export const MANAGED_CODEX_CONTRACT = `${MANAGED_BLOCK_START}
 ## Fable-ous communication
 
-Lead with the outcome, judgment, or acknowledgement. Use warm, plain language and keep routine answers compact. Give one recommendation and why it matters.
+Lead with the outcome, judgment, or acknowledgement. Use warm, plain language. Keep routine answers to 40–100 words and at most three short paragraphs. Give one recommendation and why it matters.
 
 Continue through safe, reversible, in-scope work without routine permission questions. Keep most work in the background; speak during execution only when a finding, risk, blocker, required decision, changed direction, or material proof changes what the user needs to know.
+
+Do not end while safe, reversible, in-scope work remains. End only with the completed outcome, a real user-owned blocker, or an honest not-verified result that names exactly what remains.
 
 Do not repeat client tool receipts, command counts, file reads, or running-job inventories. Preserve failed verification, uncertainty, risk, missing proof, citations, and authorization boundaries. Exact-output requests apply only when they do not conflict with safety or authorization.
 ${MANAGED_BLOCK_END}`;
 
 export function isClaudeHost(env = process.env) {
   return Boolean(env.CLAUDE_PLUGIN_ROOT) && !env.PLUGIN_ROOT;
-}
-
-export function isFableModel(model = "") {
-  return /(?:^|[-_/])fable(?:[-_/]|$)/i.test(String(model));
-}
-
-export function decideActivation({ input = {}, env = process.env } = {}) {
-  const host = isClaudeHost(env) ? "claude" : "codex";
-  if (env.FABLE_OUS_FORCE === "off") {
-    return { enabled: false, profile: "off", host, model: "", reason: "forced-off" };
-  }
-
-  if (host === "codex") return { enabled: true, profile: "full", host, reason: "codex" };
-
-  const model = String(input.model || env.FABLE_OUS_MODEL || env.ANTHROPIC_MODEL || "").trim();
-  if (!model) return { enabled: false, profile: "off", host, model: "", reason: "unknown-model" };
-
-  return {
-    enabled: true,
-    profile: isFableModel(model) ? "quiet" : "full",
-    host,
-    model,
-    reason: isFableModel(model) ? "native-fable-quiet" : "non-fable-model"
-  };
 }
 
 function resolvePaths({ agentsPath, configDir, env = process.env } = {}) {
@@ -73,6 +51,7 @@ export function hasStrongCodexContract(content = "") {
     /lead with (?:one|a|the)?\s*(?:clear\s+)?(?:recommendation|outcome|result|judgment)/i,
     /keep most work in the background|work quietly|speak only when[^.\n]*(?:finding|risk|blocker)/i,
     /do not ask[^.\n]*(?:routine|clarifying)|continue[^.\n]*safe[^.\n]*reversible/i,
+    /do not end while[^.\n]*safe[^.\n]*reversible|end only with[^.\n]*(?:completed|blocker|not-verified)/i,
     /never hide[^.\n]*(?:failed|failure|uncertainty|risk|authorization)|preserve[^.\n]*(?:proof|evidence|failed verification)/i
   ].every((pattern) => pattern.test(value));
 }
@@ -94,9 +73,22 @@ export function ensureCodexStyleLayer(options = {}) {
   const existed = existsSync(paths.agentsPath);
   const content = options.existingContent ?? readText(paths.agentsPath);
 
-  if (hasStrongCodexContract(content) || content.includes(MANAGED_BLOCK_START)) {
+  const managedStart = content.indexOf(MANAGED_BLOCK_START);
+  const managedEnd = content.indexOf(MANAGED_BLOCK_END);
+  if (managedStart >= 0 && managedEnd >= managedStart) {
+    const oldBlock = content.slice(managedStart, managedEnd + MANAGED_BLOCK_END.length);
+    const changed = oldBlock !== MANAGED_CODEX_CONTRACT;
+    const next = changed
+      ? `${content.slice(0, managedStart)}${MANAGED_CODEX_CONTRACT}${content.slice(managedEnd + MANAGED_BLOCK_END.length)}`
+      : content;
+    if (changed || (options.existingContent !== undefined && !existed)) atomicWrite(paths.agentsPath, next);
+    writeMarker(paths, "managed");
+    return { active: true, changed, source: "managed", ...paths };
+  }
+
+  if (hasStrongCodexContract(content)) {
     if (options.existingContent !== undefined && !existed) atomicWrite(paths.agentsPath, content);
-    const source = content.includes(MANAGED_BLOCK_START) ? "managed" : "existing";
+    const source = "existing";
     writeMarker(paths, source);
     return { active: true, changed: false, source, ...paths };
   }

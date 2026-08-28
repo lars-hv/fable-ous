@@ -27,7 +27,12 @@ test("strict returns the working model final without invoking a renderer", async
   const result = await runStrictTurn({
     mainThread: {
       run: async () => ({
-        finalResponse: JSON.stringify({ answer: "Direkte svar.", material_disclosures: [] }),
+        finalResponse: JSON.stringify({
+          state: "done",
+          answer: "Direkte svar.",
+          next_action: "",
+          material_disclosures: []
+        }),
         usage: null
       })
     },
@@ -39,5 +44,5 @@ test("strict returns the working model final without invoking a renderer", async
 
   expect(result.answer).toBe("Direkte svar.");
   expect(result.revised).toBe(false);
-  expect(claudeLaunchPlan(["--model=claude-fable-5"]).env.FABLE_OUS_PROFILE).toBe("quiet");
+  expect(claudeLaunchPlan(["--model=claude-fable-5"]).env).toEqual({});
 });
