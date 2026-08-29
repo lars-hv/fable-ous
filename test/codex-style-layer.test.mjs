@@ -41,6 +41,14 @@ function fixture() {
   };
 }
 
+function writeStyleMarker(paths) {
+  mkdirSync(paths.configDir, { recursive: true });
+  writeFileSync(
+    join(paths.configDir, "standard.json"),
+    `${JSON.stringify({ schema: 1, source: "managed" })}\n`
+  );
+}
+
 function withConcurrentEditAfterRead(path, readNumber, content, callback) {
   const originalRead = fs.readFileSync;
   const originalWrite = fs.writeFileSync;
@@ -71,6 +79,10 @@ test("installs one reversible Codex instruction block and stays idempotent", () 
   assert.equal(second.source, "managed");
   assert.equal(content.split(MANAGED_BLOCK_START).length - 1, 1);
   assert.equal(content.split(MANAGED_BLOCK_END).length - 1, 1);
+  const marker = JSON.parse(readFileSync(join(paths.configDir, "standard.json"), "utf8"));
+  assert.equal(marker.schema, 2);
+  assert.match(marker.binding, /^[0-9a-f]{32}$/);
+  assert.match(content, new RegExp(`codex-style:boundary:${marker.binding}`));
   assert.match(content, /completeness and clarity matter more than shortness/i);
   assert.match(content, /wording and presentation only/i);
   assert.match(content, /neither selects work nor changes/i);
@@ -289,7 +301,8 @@ test("managed AGENTS insertion and removal preserve surrounding owner bytes", ()
   const before = "  # Before  \n\t";
   const after = "  \n  # After\t \n";
   ensureCodexStyleLayer(removed);
-  writeFileSync(removed.agentsPath, `${before}${MANAGED_CODEX_CONTRACT}${after}`);
+  const installedBlock = readFileSync(removed.agentsPath, "utf8");
+  writeFileSync(removed.agentsPath, `${before}${installedBlock}${after}`);
   removeCodexStyleLayer(removed);
   assert.equal(readFileSync(removed.agentsPath, "utf8"), `${before}${after}`);
 });
@@ -301,17 +314,18 @@ test("a no-final-newline owner file keeps the managed block outside Markdown fen
 
   ensureCodexStyleLayer(paths);
   const installed = readFileSync(paths.agentsPath, "utf8");
-  assert.match(installed, new RegExp(`\\n<!-- fable-ous:codex-style:boundary -->\\n${MANAGED_BLOCK_START}`));
+  assert.match(installed, new RegExp(`\\n<!-- fable-ous:codex-style:boundary:[0-9a-f]{32} -->\\n${MANAGED_BLOCK_START}`));
   assert.doesNotMatch(installed, new RegExp(`\\x60\\x60\\x60${MANAGED_BLOCK_START}`));
 
   removeCodexStyleLayer(paths);
   assert.equal(readFileSync(paths.agentsPath, "utf8"), original);
 });
 
-test("reinstall repairs an older exact block attached to no-final-newline owner content", () => {
+test("reinstall migrates a provable legacy block after no-final-newline owner content", () => {
   const paths = fixture();
   const original = "```text\nowner rules\n```";
-  writeFileSync(paths.agentsPath, `${original}${MANAGED_CODEX_CONTRACT}`);
+  writeFileSync(paths.agentsPath, `${original.trimEnd()}\n\n${MANAGED_CODEX_CONTRACT}\n`);
+  writeFileSync(`${paths.agentsPath}.fable-ous.bak`, original);
   mkdirSync(paths.configDir, { recursive: true });
   writeFileSync(
     join(paths.configDir, "standard.json"),
@@ -322,7 +336,7 @@ test("reinstall repairs an older exact block attached to no-final-newline owner 
   assert.equal(ensureCodexStyleLayer(paths).changed, true);
   assert.match(
     readFileSync(paths.agentsPath, "utf8"),
-    new RegExp(`\\n<!-- fable-ous:codex-style:boundary -->\\n${MANAGED_BLOCK_START}`),
+    new RegExp(`\\n<!-- fable-ous:codex-style:boundary:[0-9a-f]{32} -->\\n${MANAGED_BLOCK_START}`),
   );
 
   removeCodexStyleLayer(paths);
@@ -331,7 +345,8 @@ test("reinstall repairs an older exact block attached to no-final-newline owner 
 
 test("upgrades an older managed block without duplicating it", () => {
   const paths = fixture();
-  const old = `${MANAGED_BLOCK_START}\nOld contract.\n${MANAGED_BLOCK_END}\n`;
+  const old = `\n<!-- fable-ous:codex-style:boundary -->\n${MANAGED_BLOCK_START}\nOld contract.\n${MANAGED_BLOCK_END}\n`;
+  writeStyleMarker(paths);
   ensureCodexStyleLayer({ ...paths, existingContent: old });
   const content = readFileSync(paths.agentsPath, "utf8");
 
@@ -444,7 +459,7 @@ test("install never creates a full AGENTS.md backup containing user instructions
 test("a failed AGENTS write removes or restores only the marker written by that attempt", {
   skip: process.platform === "win32"
 }, () => {
-  for (const originalMarker of [null, '{"schema":1,"source":"older-managed"}\n']) {
+  for (const originalMarker of [null, '{"schema":1,"source":"managed"}\n']) {
     const paths = fixture();
     const locked = join(paths.configDir, "locked");
     paths.agentsPath = join(locked, "AGENTS.md");
@@ -468,28 +483,34 @@ test("a failed AGENTS write removes or restores only the marker written by that 
   }
 });
 
-test("upgrade removes only a provably redundant legacy AGENTS.md backup", () => {
+test("upgrade preserves a provably related legacy AGENTS.md backup for exact rollback", () => {
   const paths = fixture();
   const original = "# Private working agreement\n\nsynthetic-secret-marker-123\n";
   const oldContract = `${MANAGED_BLOCK_START}\nOld presentation contract.\n${MANAGED_BLOCK_END}`;
   writeFileSync(paths.agentsPath, `${original.trimEnd()}\n\n${oldContract}\n`);
   writeFileSync(`${paths.agentsPath}.fable-ous.bak`, original);
+  writeStyleMarker(paths);
 
   ensureCodexStyleLayer(paths);
 
-  assert.equal(existsSync(`${paths.agentsPath}.fable-ous.bak`), false);
+  assert.equal(readFileSync(`${paths.agentsPath}.fable-ous.bak`, "utf8"), original);
   assert.match(readFileSync(paths.agentsPath, "utf8"), /synthetic-secret-marker-123/);
 });
 
-test("upgrade preserves an unproven user-owned legacy backup", () => {
+test("upgrade fails closed when an old block has only an unrelated legacy backup", () => {
   const paths = fixture();
   const oldContract = `${MANAGED_BLOCK_START}\nOld presentation contract.\n${MANAGED_BLOCK_END}`;
   writeFileSync(paths.agentsPath, `# Current user rules\n\n${oldContract}\n`);
   writeFileSync(`${paths.agentsPath}.fable-ous.bak`, "# Different historical document\n");
+  writeStyleMarker(paths);
 
-  ensureCodexStyleLayer(paths);
+  assert.throws(
+    () => ensureCodexStyleLayer(paths),
+    /unbound legacy|cannot safely/i
+  );
 
   assert.equal(readFileSync(`${paths.agentsPath}.fable-ous.bak`, "utf8"), "# Different historical document\n");
+  assert.equal(readFileSync(paths.agentsPath, "utf8"), `# Current user rules\n\n${oldContract}\n`);
 });
 
 test("native calm preferences leave verbosity to the user and stay reversible", () => {

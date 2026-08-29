@@ -101,8 +101,7 @@ function installClaudeArtifact(root, {
 function writeNativeDoctorState(codexHome) {
   mkdirSync(join(codexHome, "fable-ous"), { recursive: true });
   writeFileSync(join(codexHome, "config.toml"), 'personality = "friendly"\nhide_agent_reasoning = true\n');
-  writeFileSync(join(codexHome, "AGENTS.md"), `${MANAGED_CODEX_CONTRACT}\n`);
-  writeFileSync(join(codexHome, "fable-ous", "standard.json"), `${JSON.stringify({ schema: 1, source: "managed" })}\n`);
+  ensureCodexStyleLayer({ env: { CODEX_HOME: codexHome } });
   writeFileSync(join(codexHome, "fable-ous", "native-preferences.json"), `${JSON.stringify({
     schema: 1,
     original: {
@@ -128,6 +127,42 @@ fi
 exit 0
 `);
   chmodSync(path, 0o700);
+}
+
+function runRejectedCodexInstallPreflight({ agentsContent, configContent, styleMarkerContent }) {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-owner-preflight-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const invocationLog = join(root, "codex-invoked.log");
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const configPath = join(codexHome, "config.toml");
+  mkdirSync(bin);
+  mkdirSync(codexHome, { recursive: true });
+  writeFileSync(join(bin, "codex"), `#!/bin/sh
+printf invoked >> '${invocationLog}'
+exit 0
+`);
+  chmodSync(join(bin, "codex"), 0o700);
+  if (agentsContent !== undefined) writeFileSync(agentsPath, agentsContent);
+  if (configContent !== undefined) writeFileSync(configPath, configContent);
+  if (styleMarkerContent !== undefined) {
+    mkdirSync(join(codexHome, "fable-ous"), { recursive: true });
+    writeFileSync(join(codexHome, "fable-ous", "standard.json"), styleMarkerContent);
+  }
+  const watched = [
+    agentsPath,
+    configPath,
+    join(codexHome, "fable-ous", "standard.json")
+  ].filter((path) => existsSync(path));
+  const before = watched.map((path) => readFileSync(path));
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    { encoding: "utf8", env: { ...process.env, PATH: bin, CODEX_HOME: codexHome } }
+  );
+
+  return { before, invocationLog, result, watched };
 }
 
 test("public CLI presents Fable-ous as a native Codex plugin", () => {
@@ -405,6 +440,94 @@ test("install refuses to change Codex communication files when the added plugin 
   assert.equal(existsSync(join(codexHome, "config.toml")), false);
 });
 
+test("public install fails before host mutation for unsafe owner-controlled communication files", {
+  skip: process.platform === "win32"
+}, () => {
+  const cases = [
+    {
+      name: "non-UTF-8 AGENTS bytes",
+      agentsContent: Buffer.from([0xff, 0x23, 0x20, 0x72, 0x75, 0x6c, 0x65])
+    },
+    {
+      name: "non-UTF-8 config bytes",
+      configContent: Buffer.from([0xff, 0x70, 0x65, 0x72, 0x73, 0x6f, 0x6e, 0x61, 0x6c, 0x69, 0x74, 0x79])
+    },
+    {
+      name: "personality table conflict",
+      configContent: "[personality]\nvoice = 'calm'\n"
+    },
+    {
+      name: "quoted reasoning table conflict",
+      configContent: "['hide_agent_reasoning']\nenabled = true\n"
+    },
+    {
+      name: "managed table conflict after an unrelated table",
+      configContent: "[features]\nplugins = true\n\n[personality]\nvoice = 'calm'\n"
+    },
+    {
+      name: "fenced unowned marker example",
+      agentsContent: `# Documentation\n\n\`\`\`markdown\n${MANAGED_CODEX_CONTRACT}\n\`\`\`\n`
+    }
+  ];
+
+  for (const testCase of cases) {
+    const { before, invocationLog, result, watched } = runRejectedCodexInstallPreflight(testCase);
+
+    assert.notEqual(result.status, 0, testCase.name);
+    assert.match(result.stderr, /UTF-8|conflicting TOML table|unowned Fable-ous marker/i, testCase.name);
+    assert.deepEqual(watched.map((path) => readFileSync(path)), before, testCase.name);
+    assert.equal(existsSync(invocationLog), false, `${testCase.name}: Codex was invoked`);
+  }
+});
+
+test("public install and style-off reject a stale legacy marker beside a fenced user example", {
+  skip: process.platform === "win32"
+}, () => {
+  const staleMarker = '{"schema":1,"source":"managed"}\n';
+  const examples = [
+    {
+      name: "fenced historical example",
+      content: `# Historical documentation\n\n\`\`\`markdown\n\n<!-- fable-ous:codex-style:boundary -->\n${MANAGED_CODEX_CONTRACT}\n\`\`\`\n`
+    },
+    {
+      name: "marker example at byte zero",
+      content: `${MANAGED_CODEX_CONTRACT}\n`
+    }
+  ];
+
+  for (const example of examples) {
+    const install = runRejectedCodexInstallPreflight({
+      agentsContent: example.content,
+      styleMarkerContent: staleMarker
+    });
+
+    assert.notEqual(install.result.status, 0, example.name);
+    assert.match(install.result.stderr, /ownership|bound|unowned|cannot safely/i, example.name);
+    assert.deepEqual(install.watched.map((path) => readFileSync(path)), install.before, example.name);
+    assert.equal(existsSync(install.invocationLog), false, `${example.name}: Codex was invoked`);
+
+    const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-stale-marker-"));
+    const codexHome = join(root, "codex-home");
+    const configDir = join(codexHome, "fable-ous");
+    const agentsPath = join(codexHome, "AGENTS.md");
+    const markerPath = join(configDir, "standard.json");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(agentsPath, example.content);
+    writeFileSync(markerPath, staleMarker);
+    const before = [readFileSync(agentsPath), readFileSync(markerPath)];
+
+    const result = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+      { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
+    );
+
+    assert.notEqual(result.status, 0, example.name);
+    assert.match(result.stderr, /ownership|bound|unowned|cannot safely/i, example.name);
+    assert.deepEqual([readFileSync(agentsPath), readFileSync(markerPath)], before, example.name);
+  }
+});
+
 test("style-off fails before changing any communication file when rollback evidence is corrupt", () => {
   const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-preflight-"));
   const codexHome = join(root, "codex-home");
@@ -429,6 +552,171 @@ test("style-off fails before changing any communication file when rollback evide
   assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stderr, /invalid rollback marker|cannot safely/i);
   assert.deepEqual(paths.map((path) => readFileSync(path, "utf8")), before);
+});
+
+test("public style-off restores a legacy AGENTS file byte-for-byte and keeps its rollback backup", () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-legacy-bytes-"));
+  const codexHome = join(root, "codex-home");
+  const configDir = join(codexHome, "fable-ous");
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const backupPath = `${agentsPath}.fable-ous.bak`;
+  const original = Buffer.from("# Owner rules without final newline");
+  mkdirSync(configDir, { recursive: true });
+  writeFileSync(agentsPath, Buffer.concat([
+    original,
+    Buffer.from(`\n\n${MANAGED_CODEX_CONTRACT}\n`)
+  ]));
+  writeFileSync(backupPath, original);
+  writeFileSync(join(configDir, "standard.json"), '{"schema":1,"source":"managed"}\n');
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+    { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.deepEqual(readFileSync(agentsPath), original);
+  assert.deepEqual(readFileSync(backupPath), original);
+});
+
+test("public install preserves a proven legacy AGENTS rollback backup", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-legacy-backup-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const configDir = join(codexHome, "fable-ous");
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const backupPath = `${agentsPath}.fable-ous.bak`;
+  const original = "# Owner rules\n";
+  mkdirSync(bin);
+  mkdirSync(configDir, { recursive: true });
+  const { entry } = installCodexArtifact(codexHome);
+  writePluginListCommand(join(bin, "codex"), { installed: [entry] });
+  writeFileSync(agentsPath, `${original.trimEnd()}\n\n${MANAGED_CODEX_CONTRACT}\n`);
+  writeFileSync(backupPath, original);
+  writeFileSync(join(configDir, "standard.json"), '{"schema":1,"source":"managed"}\n');
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    { encoding: "utf8", env: { ...process.env, PATH: bin, CODEX_HOME: codexHome } }
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.deepEqual(readFileSync(backupPath), Buffer.from(original));
+});
+
+test("public style-off never treats a fenced user marker example as owned", () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-unowned-example-"));
+  const codexHome = join(root, "codex-home");
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const original = `# Documentation\n\n\`\`\`markdown\n${MANAGED_CODEX_CONTRACT}\n\`\`\`\n`;
+  mkdirSync(codexHome, { recursive: true });
+  writeFileSync(agentsPath, original);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+    { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(readFileSync(agentsPath, "utf8"), original);
+});
+
+test("public style-off fails closed on non-UTF-8 AGENTS and config bytes", () => {
+  for (const target of ["AGENTS.md", "config.toml"]) {
+    const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-non-utf8-"));
+    const codexHome = join(root, "codex-home");
+    const configDir = join(codexHome, "fable-ous");
+    mkdirSync(configDir, { recursive: true });
+    ensureCodexStyleLayer({ env: { CODEX_HOME: codexHome } });
+    writeFileSync(join(codexHome, "config.toml"), 'personality = "friendly"\nhide_agent_reasoning = true\n');
+    writeFileSync(join(configDir, "native-preferences.json"), `${JSON.stringify({
+      schema: 1,
+      original: {
+        personality: { present: false },
+        hide_agent_reasoning: { present: false }
+      }
+    })}\n`);
+    const targetPath = join(codexHome, target);
+    const invalid = Buffer.concat([Buffer.from([0xff]), readFileSync(targetPath)]);
+    writeFileSync(targetPath, invalid);
+    const watched = [
+      join(codexHome, "AGENTS.md"),
+      join(codexHome, "config.toml"),
+      join(configDir, "standard.json"),
+      join(configDir, "native-preferences.json")
+    ];
+    const before = watched.map((path) => readFileSync(path));
+
+    const result = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+      { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
+    );
+
+    assert.notEqual(result.status, 0, target);
+    assert.match(result.stderr, /UTF-8|safely read/i, target);
+    assert.deepEqual(watched.map((path) => readFileSync(path)), before, target);
+  }
+});
+
+test("public style-off preserves a valid UTF-8 byte-order mark", () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-utf8-bom-"));
+  const codexHome = join(root, "codex-home");
+  const configDir = join(codexHome, "fable-ous");
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const expected = Buffer.from([0xef, 0xbb, 0xbf]);
+  mkdirSync(configDir, { recursive: true });
+  writeFileSync(agentsPath, expected);
+  ensureCodexStyleLayer({ env: { CODEX_HOME: codexHome } });
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+    { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.deepEqual(readFileSync(agentsPath), expected);
+});
+
+test("public style-off rejects managed names used as TOML tables without changing any file", () => {
+  for (const config of ["[personality]\nvoice = 'calm'\n", "['hide_agent_reasoning']\nenabled = true\n"]) {
+    const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-table-conflict-"));
+    const codexHome = join(root, "codex-home");
+    const configDir = join(codexHome, "fable-ous");
+    mkdirSync(configDir, { recursive: true });
+    ensureCodexStyleLayer({ env: { CODEX_HOME: codexHome } });
+    writeFileSync(join(codexHome, "config.toml"), config);
+    writeFileSync(join(configDir, "native-preferences.json"), `${JSON.stringify({
+      schema: 1,
+      original: {
+        personality: { present: false },
+        hide_agent_reasoning: { present: false }
+      }
+    })}\n`);
+    const watched = [
+      join(codexHome, "AGENTS.md"),
+      join(codexHome, "config.toml"),
+      join(configDir, "standard.json"),
+      join(configDir, "native-preferences.json")
+    ];
+    const before = watched.map((path) => readFileSync(path));
+
+    const result = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+      { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
+    );
+
+    assert.notEqual(result.status, 0, config);
+    assert.match(result.stderr, /conflicting TOML table|cannot safely/i, config);
+    assert.deepEqual(watched.map((path) => readFileSync(path)), before, config);
+  }
 });
 
 test("style-off fails before mutation when its managed marker is not a regular file", () => {
@@ -824,6 +1112,33 @@ test("doctor rejects unmatched AGENTS markers around an exact managed contract",
   assert.match(report.nativeMode.error, /safely inspect/i);
 });
 
+test("public doctor rejects empty or malformed durable-style ownership markers", {
+  skip: process.platform === "win32"
+}, () => {
+  for (const marker of ["", "{", "{}\n"]) {
+    const root = mkdtempSync(join(tmpdir(), "fable-ous-doctor-invalid-style-marker-"));
+    const bin = join(root, "bin");
+    const codexHome = join(root, "codex-home");
+    mkdirSync(bin);
+    mkdirSync(codexHome, { recursive: true });
+    const { entry } = installCodexArtifact(codexHome);
+    writePluginListCommand(join(bin, "codex"), { installed: [entry] });
+    writeNativeDoctorState(codexHome);
+    writeFileSync(join(codexHome, "fable-ous", "standard.json"), marker);
+
+    const result = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "doctor"],
+      { encoding: "utf8", env: { ...process.env, PATH: bin, CODEX_HOME: codexHome } }
+    );
+
+    assert.notEqual(result.status, 0, marker);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.nativeMode.durableStyle, false, marker);
+    assert.match(report.nativeMode.error, /safely inspect/i, marker);
+  }
+});
+
 test("public doctor reads native settings from CODEX_HOME", {
   skip: process.platform === "win32"
 }, () => {
@@ -1120,4 +1435,50 @@ test("push CI checks the pushed commit instead of an empty main-to-main diff", (
   assert.match(workflow, /git cat-file -e "\$BEFORE\^\{commit\}"/);
   assert.match(workflow, /oven-sh\/setup-bun@v2[\s\S]*bun test test\/fable-ous-boundary\.proof\.test\.ts/);
   assert.match(workflow, /runs-on:\s*windows-latest[\s\S]*npm ci[\s\S]*npm run check/);
+});
+
+test("release CI validates both portable plugin manifests", () => {
+  const workflow = readFileSync(new URL(".github/workflows/verify.yml", ROOT), "utf8");
+  const primaryJob = workflow.slice(workflow.indexOf("  test:"), workflow.indexOf("  windows-node:"));
+
+  assert.match(primaryJob, /npm run validate:plugins/);
+  assert.match(primaryJob, /4210c08defe92fe8828f789b6f9fda287ad3709e/);
+  assert.match(primaryJob, /@anthropic-ai\/claude-code@2\.1\.251/);
+  assert.match(primaryJob, /FABLE_OUS_CODEX_VALIDATOR/);
+});
+
+test("plugin validation runs in a clean CI-like home with explicitly provisioned host validators", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-validator-clean-home-"));
+  const cleanHome = join(root, "home");
+  const codexHome = join(root, "codex-home");
+  const codexLog = join(root, "codex-validator.log");
+  const claudeLog = join(root, "claude-validator.log");
+  const codexValidator = join(root, "validate_plugin.py");
+  const claudeValidator = join(root, "claude-validator");
+  mkdirSync(cleanHome);
+  mkdirSync(codexHome);
+  writeFileSync(codexValidator, `from pathlib import Path\nPath(${JSON.stringify(codexLog)}).write_text("validated")\n`);
+  writeFileSync(claudeValidator, `#!/bin/sh\nprintf validated > '${claudeLog}'\n`);
+  chmodSync(claudeValidator, 0o700);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("scripts/validate-plugins.mjs", ROOT))],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HOME: cleanHome,
+        CODEX_HOME: codexHome,
+        FABLE_OUS_CODEX_VALIDATOR: codexValidator,
+        FABLE_OUS_CLAUDE_COMMAND: claudeValidator
+      }
+    }
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(readFileSync(codexLog, "utf8"), "validated");
+  assert.equal(readFileSync(claudeLog, "utf8"), "validated");
 });

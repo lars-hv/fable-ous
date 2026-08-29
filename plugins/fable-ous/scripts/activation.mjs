@@ -8,12 +8,14 @@ import {
   rmSync,
   writeFileSync
 } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 export const MANAGED_BLOCK_START = "<!-- fable-ous:codex-style:start -->";
 export const MANAGED_BLOCK_END = "<!-- fable-ous:codex-style:end -->";
 const MANAGED_BLOCK_SEPARATOR = "\n<!-- fable-ous:codex-style:boundary -->\n";
+const STYLE_BINDING_PATTERN = /^[0-9a-f]{32}$/u;
 export const NATIVE_CODEX_PREFERENCES = {
   personality: '"friendly"',
   hide_agent_reasoning: "true"
@@ -101,26 +103,34 @@ function removeOwnedPath(path, options = {}) {
   activeOwnedTransaction?.record(path, { path, existed: false });
 }
 
-function readText(path) {
+function decodeUtf8(content, path) {
   try {
-    return readFileSync(path, "utf8");
-  } catch {
-    return "";
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(content);
+  } catch (error) {
+    throw new Error(`Cannot safely read non-UTF-8 file ${path}: ${error?.message || "invalid UTF-8"}`);
   }
 }
 
 function readOptionalText(path) {
   try {
-    return readFileSync(path, "utf8");
+    return decodeUtf8(readFileSync(path), path);
   } catch (error) {
     if (error?.code === "ENOENT") return "";
+    if (/non-UTF-8/u.test(error?.message || "")) throw error;
     throw new Error(`Cannot safely read ${path}: ${error?.message || "unknown error"}`);
   }
 }
 
 function readJson(path) {
+  let content;
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    content = readOptionalText(path);
+  } catch {
+    throw new Error(`Cannot safely read JSON file: ${path}`);
+  }
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(content);
   } catch {
     return null;
   }
@@ -214,13 +224,21 @@ function tomlStateAfterLine(line, initialState = {}) {
 
 function firstTopLevelTableIndex(content) {
   let offset = 0;
+  let firstTable = -1;
   let state = { multiline: null, arrayDepth: 0 };
   for (const segment of content.match(/[^\n]*(?:\n|$)/g) || []) {
     if (!segment) continue;
     const line = segment.replace(/\r?\n$/u, "");
     if (state.multiline === null && state.arrayDepth === 0) {
-      if (/^[ \t]*(?:\[[^\]\r\n]+\]|\[\[[^\]\r\n]+\]\])[ \t]*(?:#.*)?$/u.test(line)) return offset;
-      if (/^[ \t]*\[.*\][ \t]*(?:#.*)?$/u.test(line)) {
+      const table = /^[ \t]*\[([^\]\r\n]+)\][ \t]*(?:#.*)?$/u.exec(line)
+        || /^[ \t]*\[\[([^\]\r\n]+)\]\][ \t]*(?:#.*)?$/u.exec(line);
+      if (table) {
+        const keys = parseTomlKeyPath(`${table[1]}=`);
+        if (keys?.[0] && Object.hasOwn(NATIVE_CODEX_PREFERENCES, keys[0])) {
+          throw new Error(`Conflicting TOML table for managed Codex setting: ${keys[0]}`);
+        }
+        if (firstTable < 0) firstTable = offset;
+      } else if (/^[ \t]*\[.*\][ \t]*(?:#.*)?$/u.test(line)) {
         throw new Error("Cannot safely update a config with an unsupported TOML table header.");
       }
     }
@@ -230,7 +248,7 @@ function firstTopLevelTableIndex(content) {
   if (state.multiline !== null || state.arrayDepth !== 0) {
     throw new Error("Cannot safely update a config with an unclosed or unsupported TOML value.");
   }
-  return -1;
+  return firstTable;
 }
 
 function parseTomlKeyPath(line) {
@@ -409,14 +427,80 @@ function validNativeMarker(marker) {
   );
 }
 
-export function assertSafeCodexCommunicationPaths(options = {}) {
+function validStyleMarker(marker) {
+  if (!isPlainObject(marker) || marker.source !== "managed") return false;
+  if (marker.schema === 1) return Object.keys(marker).sort().join(",") === "schema,source";
+  return marker.schema === 2
+    && STYLE_BINDING_PATTERN.test(marker.binding)
+    && Object.keys(marker).sort().join(",") === "binding,schema,source";
+}
+
+function readStyleMarker(paths) {
+  if (!existsSync(paths.markerPath)) return null;
+  const marker = readJson(paths.markerPath);
+  if (!validStyleMarker(marker)) {
+    throw new Error(`Cannot safely update invalid style marker: ${paths.markerPath}`);
+  }
+  return marker;
+}
+
+function managedBlockIsInsideFence(content, managed) {
+  let fence = null;
+  for (const line of content.slice(0, managed.start).split(/\r?\n/u)) {
+    const candidate = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
+    if (!candidate) continue;
+    const marker = candidate[1];
+    if (!fence) {
+      fence = { character: marker[0], length: marker.length };
+      continue;
+    }
+    if (marker[0] === fence.character
+      && marker.length >= fence.length
+      && /^[ \t]*$/u.test(candidate[2])) {
+      fence = null;
+    }
+  }
+  return Boolean(fence);
+}
+
+function styleOwnership(paths, content, managed, options = {}) {
+  const marker = readStyleMarker(paths);
+  if (!marker) return { owned: false, marker: null };
+  if (!managed) {
+    if (marker.schema === 2 && !options.allowOrphanMarker) {
+      throw new Error("Cannot safely update a style marker that is not bound to AGENTS.md content.");
+    }
+    return { owned: true, legacy: marker.schema === 1, marker };
+  }
+  if (marker.schema === 2) {
+    if (managed.binding !== marker.binding) {
+      throw new Error("Cannot safely update AGENTS.md because its style ownership binding does not match.");
+    }
+    return { owned: true, binding: marker.binding, legacy: false, marker };
+  }
+  const legacyBackup = provableLegacyBackup(paths, content, managed);
+  const safeLegacy = Boolean(legacyBackup)
+    || (managed.boundary === "legacy" && !managedBlockIsInsideFence(content, managed));
+  if (!safeLegacy) {
+    throw new Error("Cannot safely update an unbound legacy Fable-ous marker in AGENTS.md.");
+  }
+  return { owned: true, legacy: true, legacyBackup, marker };
+}
+
+export function assertSafeCodexCommunicationPaths(options = {}, safety = {}) {
   const paths = resolvePaths(options);
   for (const path of [paths.agentsPath, paths.codexConfigPath, paths.markerPath, paths.nativeMarkerPath]) {
     requireRegularFileOrAbsent(path);
   }
 
   const agentsContent = readOptionalText(paths.agentsPath);
-  managedBlockBounds(agentsContent);
+  const managed = managedBlockBounds(agentsContent);
+  const ownership = styleOwnership(paths, agentsContent, managed, {
+    allowOrphanMarker: safety.allowOrphanStyleMarker
+  });
+  if (managed && !ownership.owned && !safety.allowUnownedStyleMarkers) {
+    throw new Error("Cannot safely update an unowned Fable-ous marker example in AGENTS.md.");
+  }
 
   const configContent = readOptionalText(paths.codexConfigPath);
   const markerExists = existsSync(paths.nativeMarkerPath);
@@ -497,7 +581,7 @@ export function isNativeCodexPreferencesActive(options = {}) {
   requireRegularFileOrAbsent(paths.nativeMarkerPath);
   if (!existsSync(paths.nativeMarkerPath)) return false;
   if (!validNativeMarker(readJson(paths.nativeMarkerPath))) return false;
-  const content = readText(paths.codexConfigPath);
+  const content = readOptionalText(paths.codexConfigPath);
   return Object.entries(NATIVE_CODEX_PREFERENCES).every(([key, value]) => {
     const setting = findTopLevelSetting(content, key);
     return settingHasDesiredValue(setting, value);
@@ -539,15 +623,19 @@ export function removeNativeCodexPreferences(options = {}) {
   return { restored: changed, ...paths };
 }
 
-function writeMarker(paths, source) {
-  atomicWrite(paths.markerPath, `${JSON.stringify({ schema: 1, source })}\n`);
+function boundBlockSeparator(binding) {
+  return `\n<!-- fable-ous:codex-style:boundary:${binding} -->\n`;
 }
 
-function writeStyleWithMarker(paths, content) {
+function writeMarker(paths, marker) {
+  atomicWrite(paths.markerPath, `${JSON.stringify(marker)}\n`);
+}
+
+function writeStyleWithMarker(paths, content, marker) {
   const markerExisted = existsSync(paths.markerPath);
   const previousMarker = markerExisted ? readOptionalText(paths.markerPath) : null;
-  const managedMarker = `${JSON.stringify({ schema: 1, source: "managed" })}\n`;
-  writeMarker(paths, "managed");
+  const managedMarker = `${JSON.stringify(marker)}\n`;
+  writeMarker(paths, marker);
   try {
     atomicWrite(paths.agentsPath, content);
   } catch (error) {
@@ -577,16 +665,15 @@ function managedBlockBounds(content) {
   if (end < start) {
     throw new Error("Cannot safely update a malformed Fable-ous block in AGENTS.md.");
   }
-  const separatorStart = start - MANAGED_BLOCK_SEPARATOR.length;
-  const removalStart = separatorStart >= 0
-    && content.slice(separatorStart, start) === MANAGED_BLOCK_SEPARATOR
-    ? separatorStart
-    : start;
-  return { start, end, removalStart };
-}
-
-function managedBlockNeedsBoundary(content, managed) {
-  return managed.start > 0 && !/[\r\n]/u.test(content[managed.start - 1]);
+  const legacyStart = start - MANAGED_BLOCK_SEPARATOR.length;
+  if (legacyStart >= 0 && content.slice(legacyStart, start) === MANAGED_BLOCK_SEPARATOR) {
+    return { start, end, removalStart: legacyStart, boundary: "legacy", binding: null };
+  }
+  const before = content.slice(0, start);
+  const bound = /\n<!-- fable-ous:codex-style:boundary:([0-9a-f]{32}) -->\n$/u.exec(before);
+  return bound
+    ? { start, end, removalStart: start - bound[0].length, boundary: "bound", binding: bound[1] }
+    : { start, end, removalStart: start, boundary: null, binding: null };
 }
 
 function withoutManagedBlock(content, managed) {
@@ -594,24 +681,17 @@ function withoutManagedBlock(content, managed) {
   return `${content.slice(0, removalStart)}${content.slice(end + MANAGED_BLOCK_END.length)}`;
 }
 
-function legacyWithoutManagedBlock(content, managed) {
-  const { end, removalStart = managed.start } = managed;
-  const before = content.slice(0, removalStart).trimEnd();
-  const after = content.slice(end + MANAGED_BLOCK_END.length).trimStart();
-  const next = [before, after].filter(Boolean).join("\n\n");
-  return next ? `${next}\n` : "";
-}
-
-function removeRedundantLegacyBackup(paths, content) {
+function provableLegacyBackup(paths, content, managed) {
   const backupPath = `${paths.agentsPath}.fable-ous.bak`;
   try {
-    if (!lstatSync(backupPath).isFile()) return false;
-    const managed = managedBlockBounds(content);
-    if (!managed || readFileSync(backupPath, "utf8") !== legacyWithoutManagedBlock(content, managed)) return false;
-    rmSync(backupPath);
-    return true;
+    const stat = lstatSync(backupPath);
+    if (!stat.isFile() || stat.isSymbolicLink()) return null;
+    const bytes = readFileSync(backupPath);
+    const original = decodeUtf8(bytes, backupPath);
+    const block = content.slice(managed.start, managed.end + MANAGED_BLOCK_END.length);
+    return content === `${original.trimEnd()}\n\n${block}\n` ? bytes : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -623,25 +703,35 @@ export function ensureCodexStyleLayer(options = {}) {
   const content = options.existingContent ?? readOptionalText(paths.agentsPath);
 
   const managed = managedBlockBounds(content);
+  const ownership = styleOwnership(paths, content, managed);
+  if (managed && !ownership.owned) {
+    throw new Error("Cannot safely update an unowned Fable-ous marker example in AGENTS.md.");
+  }
+  const binding = ownership.binding || randomBytes(16).toString("hex");
+  const marker = { schema: 2, source: "managed", binding };
   if (managed) {
     const { start: managedStart, end: managedEnd } = managed;
     const oldBlock = content.slice(managedStart, managedEnd + MANAGED_BLOCK_END.length);
-    const needsBoundary = managedBlockNeedsBoundary(content, managed);
-    const changed = oldBlock !== MANAGED_CODEX_CONTRACT || needsBoundary;
-    const next = changed
-      ? `${content.slice(0, managedStart)}${needsBoundary ? MANAGED_BLOCK_SEPARATOR : ""}${MANAGED_CODEX_CONTRACT}${content.slice(managedEnd + MANAGED_BLOCK_END.length)}`
-      : content;
-    if (changed || (options.existingContent !== undefined && !existed)) {
-      writeStyleWithMarker(paths, next);
-    } else {
-      writeMarker(paths, "managed");
+    let next = content;
+    if (ownership.legacyBackup) {
+      const original = decodeUtf8(ownership.legacyBackup, `${paths.agentsPath}.fable-ous.bak`);
+      next = `${original}${boundBlockSeparator(binding)}${MANAGED_CODEX_CONTRACT}`;
+    } else if (ownership.legacy) {
+      next = `${content.slice(0, managed.removalStart)}${boundBlockSeparator(binding)}${MANAGED_CODEX_CONTRACT}${content.slice(managedEnd + MANAGED_BLOCK_END.length)}`;
+    } else if (oldBlock !== MANAGED_CODEX_CONTRACT) {
+      next = `${content.slice(0, managedStart)}${MANAGED_CODEX_CONTRACT}${content.slice(managedEnd + MANAGED_BLOCK_END.length)}`;
     }
-    removeRedundantLegacyBackup(paths, next);
+    const changed = next !== content || ownership.legacy;
+    if (changed || (options.existingContent !== undefined && !existed)) {
+      writeStyleWithMarker(paths, next, marker);
+    } else {
+      writeMarker(paths, marker);
+    }
     return { active: true, changed, source: "managed", ...paths };
   }
 
-  const next = `${content}${MANAGED_BLOCK_SEPARATOR}${MANAGED_CODEX_CONTRACT}`;
-  writeStyleWithMarker(paths, next);
+  const next = `${content}${boundBlockSeparator(binding)}${MANAGED_CODEX_CONTRACT}`;
+  writeStyleWithMarker(paths, next, marker);
   return { active: true, changed: true, source: "managed", ...paths };
 }
 
@@ -649,11 +739,12 @@ export function isCodexStyleLayerActive(options = {}) {
   const paths = resolvePaths(options);
   requireRegularFileOrAbsent(paths.agentsPath);
   requireRegularFileOrAbsent(paths.markerPath);
-  if (!existsSync(paths.markerPath)) return false;
   const content = readOptionalText(paths.agentsPath);
   const managed = managedBlockBounds(content);
+  const ownership = styleOwnership(paths, content, managed);
   return Boolean(managed)
-    && !managedBlockNeedsBoundary(content, managed)
+    && ownership.owned
+    && !ownership.legacy
     && content.slice(managed.start, managed.end + MANAGED_BLOCK_END.length) === MANAGED_CODEX_CONTRACT;
 }
 
@@ -663,10 +754,13 @@ export function removeCodexStyleLayer(options = {}) {
   requireRegularFileOrAbsent(paths.markerPath);
   const content = readOptionalText(paths.agentsPath);
   const managed = managedBlockBounds(content);
+  const ownership = styleOwnership(paths, content, managed, { allowOrphanMarker: true });
+  if (!ownership.owned) return { removed: false, ...paths };
   let removed = false;
 
   if (managed) {
-    atomicWrite(paths.agentsPath, withoutManagedBlock(content, managed));
+    const legacyBackup = ownership.legacyBackup;
+    atomicWrite(paths.agentsPath, legacyBackup || withoutManagedBlock(content, managed));
     removed = true;
   }
 
@@ -746,10 +840,11 @@ function restoreOwnedSnapshots(snapshots, producedStates, paths) {
 function runCodexCommunicationTransaction(
   options,
   operation,
-  rollbackMessage = "Fable-ous style-off failed and its owned-file rollback was incomplete."
+  rollbackMessage = "Fable-ous style-off failed and its owned-file rollback was incomplete.",
+  safety = {}
 ) {
   if (activeOwnedTransaction) throw new Error("Nested Fable-ous communication transactions are not supported.");
-  const paths = assertSafeCodexCommunicationPaths(options);
+  const paths = assertSafeCodexCommunicationPaths(options, safety);
   const snapshots = [
     paths.agentsPath,
     paths.codexConfigPath,
@@ -809,5 +904,8 @@ export function removeCodexCommunicationLayer(options = {}) {
     }
     const style = removeCodexStyleLayer(options);
     return { style, nativePreferences };
+  }, "Fable-ous style-off failed and its owned-file rollback was incomplete.", {
+    allowUnownedStyleMarkers: true,
+    allowOrphanStyleMarker: true
   });
 }

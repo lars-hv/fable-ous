@@ -11,10 +11,10 @@ const PLUGIN_ROOT = resolve(ROOT, "plugins/fable-ous");
 const CODEX_ROOT = process.env.CODEX_HOME
   ? resolve(process.env.CODEX_HOME)
   : resolve(homedir(), ".codex");
-const CODEX_VALIDATOR = resolve(
-  CODEX_ROOT,
-  "skills/.system/plugin-creator/scripts/validate_plugin.py"
-);
+const CODEX_VALIDATOR = process.env.FABLE_OUS_CODEX_VALIDATOR
+  ? resolve(process.env.FABLE_OUS_CODEX_VALIDATOR)
+  : resolve(CODEX_ROOT, "skills/.system/plugin-creator/scripts/validate_plugin.py");
+const CLAUDE_COMMAND = process.env.FABLE_OUS_CLAUDE_COMMAND || "claude";
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: ROOT, stdio: "inherit" });
@@ -29,4 +29,4 @@ if (!existsSync(CODEX_VALIDATOR)) {
 }
 
 run("python3", [CODEX_VALIDATOR, PLUGIN_ROOT]);
-run("claude", ["plugin", "validate", PLUGIN_ROOT]);
+run(CLAUDE_COMMAND, ["plugin", "validate", PLUGIN_ROOT]);

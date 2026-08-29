@@ -19,11 +19,28 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
       - run: npm ci
+      - name: Provision pinned official plugin validators
+        run: |
+          mkdir -p "$RUNNER_TEMP/plugin-creator/scripts"
+          curl --fail --silent --show-error --location \
+            "https://raw.githubusercontent.com/openai/codex/4210c08defe92fe8828f789b6f9fda287ad3709e/codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py" \
+            --output "$RUNNER_TEMP/plugin-creator/scripts/validate_plugin.py"
+          curl --fail --silent --show-error --location \
+            "https://raw.githubusercontent.com/openai/codex/4210c08defe92fe8828f789b6f9fda287ad3709e/codex-rs/skills/src/assets/samples/plugin-creator/scripts/identifier_validation.py" \
+            --output "$RUNNER_TEMP/plugin-creator/scripts/identifier_validation.py"
+          python -m pip install --disable-pip-version-check PyYAML==6.0.3
+          npm install --global @anthropic-ai/claude-code@2.1.251
       - run: npm run check
+      - run: npm run validate:plugins
+        env:
+          FABLE_OUS_CODEX_VALIDATOR: ${{ runner.temp }}/plugin-creator/scripts/validate_plugin.py
       - run: bun test test/fable-ous-boundary.proof.test.ts
       - run: npm run check:package
       - run: npm audit --audit-level=low
