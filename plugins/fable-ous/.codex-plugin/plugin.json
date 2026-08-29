@@ -1,6 +1,6 @@
 {
   "name": "fable-ous",
-  "version": "0.2.6+codex.20260829160721",
+  "version": "0.2.6+codex.20260829221500",
   "description": "Presentation-focused native Codex communication with coding controls left to the host.",
   "author": {
     "name": "Lars"

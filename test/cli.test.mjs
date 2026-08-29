@@ -1257,7 +1257,7 @@ test("doctor rejects enabled stale, hooked, replacement, or wrong-source Codex a
   }
 });
 
-test("doctor follows Codex's exact active source instead of a stale same-version cache copy", {
+test("doctor rejects a stale same-version active cache even when the Codex source is exact", {
   skip: process.platform === "win32"
 }, () => {
   const root = mkdtempSync(join(tmpdir(), "fable-ous-doctor-active-source-"));
@@ -1277,11 +1277,12 @@ test("doctor follows Codex's exact active source instead of a stale same-version
     { encoding: "utf8", env: { ...process.env, PATH: bin, CODEX_HOME: codexHome } }
   );
 
-  assert.equal(result.status, 0, result.stderr);
+  assert.notEqual(result.status, 0, result.stderr);
   const report = JSON.parse(result.stdout);
   assert.equal(report.codex.sourceBound, true);
-  assert.equal(report.codex.artifactBound, true);
-  assert.equal(report.codex.lifecycleHooks, false);
+  assert.equal(report.codex.artifactBound, false);
+  assert.equal(report.codex.lifecycleHooks, true);
+  assert.equal(report.codex.healthy, false);
 });
 
 test("doctor rejects an enabled Claude artifact from the old hook and SDK design", {

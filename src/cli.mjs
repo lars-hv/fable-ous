@@ -204,10 +204,7 @@ function safeCacheComponent(value) {
   return typeof value === "string" && /^[A-Za-z0-9_.+-]+$/u.test(value);
 }
 
-function codexArtifactPath(plugin, codexHome) {
-  if (plugin?.source?.source === "local" && typeof plugin.source.path === "string") {
-    return resolve(plugin.source.path);
-  }
+function codexActiveCachePath(plugin, codexHome) {
   if ([plugin?.marketplaceName, plugin?.name, plugin?.version].every(safeCacheComponent)) {
     const cached = join(
       codexHome,
@@ -238,7 +235,7 @@ function codexPluginStatus(pluginList, codexHome) {
     artifactBound: false
   };
 
-  const boundary = artifactBoundary(codexArtifactPath(plugin, codexHome));
+  const boundary = artifactBoundary(codexActiveCachePath(plugin, codexHome));
   const sourceBound = plugin.source?.source === "local"
     && sameRealPath(plugin.source.path, PLUGIN_ROOT)
     && plugin.marketplaceSource?.sourceType === "local"
