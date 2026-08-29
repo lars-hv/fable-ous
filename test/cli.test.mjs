@@ -373,6 +373,11 @@ test("Windows command shims use an explicitly quoted ComSpec plan", () => {
     shell: false,
     windowsVerbatimArguments: true
   });
+  assert.doesNotThrow(() => windowsCommandPlan(
+    "C:\\Program Files (x86)\\npm\\codex.cmd",
+    ["plugin", "add", "C:\\Work (Preview)\\fable-ous"],
+    { ComSpec: "C:\\Windows\\System32\\cmd.exe" }
+  ));
 });
 
 test("install refuses to change Codex communication files when the added plugin is not active", {
@@ -780,6 +785,32 @@ test("doctor reports unhealthy when a managed marker is not a regular file", {
   const markerPath = join(codexHome, "fable-ous", "standard.json");
   rmSync(markerPath);
   mkdirSync(markerPath);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "doctor"],
+    { encoding: "utf8", env: { ...process.env, PATH: bin, CODEX_HOME: codexHome } }
+  );
+
+  assert.notEqual(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.nativeMode.durableStyle, false);
+  assert.match(report.nativeMode.error, /safely inspect/i);
+});
+
+test("doctor rejects unmatched AGENTS markers around an exact managed contract", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-doctor-marker-shape-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  mkdirSync(bin);
+  mkdirSync(codexHome, { recursive: true });
+  const { entry } = installCodexArtifact(codexHome);
+  writePluginListCommand(join(bin, "codex"), { installed: [entry] });
+  writeNativeDoctorState(codexHome);
+  const agentsPath = join(codexHome, "AGENTS.md");
+  writeFileSync(agentsPath, `${readFileSync(agentsPath, "utf8")}<!-- fable-ous:codex-style:start -->\n`);
 
   const result = spawnSync(
     process.execPath,

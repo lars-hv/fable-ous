@@ -85,6 +85,7 @@ function atomicWrite(path, content, mode = 0o600) {
     writeFileSync(temporary, content, { encoding: "utf8", mode: effectiveMode, flag: "wx" });
     chmodSync(temporary, effectiveMode);
     const produced = ownedPathState(temporary);
+    activeOwnedTransaction?.assertCurrent(path);
     renameSync(temporary, path);
     activeOwnedTransaction?.record(path, produced);
   } finally {
@@ -94,6 +95,7 @@ function atomicWrite(path, content, mode = 0o600) {
 
 function removeOwnedPath(path, options = {}) {
   requireRegularFileOrAbsent(path);
+  activeOwnedTransaction?.assertCurrent(path);
   rmSync(path, options);
   activeOwnedTransaction?.record(path, { path, existed: false });
 }
@@ -340,9 +342,29 @@ function restoreManagedSetting(content, key, managedValue, previous) {
   if (!setting || !settingHasDesiredValue(setting, managedValue)) {
     return { content, changed: false };
   }
+  if (!previous?.present && setting.line !== `${key} = ${managedValue}`) {
+    return { content, changed: false };
+  }
+
+  let restoredLine = previous?.line;
+  if (previous?.present && setting.line !== `${key} = ${managedValue}`) {
+    const equals = setting.line.indexOf("=");
+    const tail = setting.line.slice(equals + 1);
+    const token = /^(\s*)("(?:[^"\\]|\\.)*"|'[^']*'|true|false)(\s*(?:#.*)?)$/u.exec(tail);
+    const previousSetting = findTopLevelSetting(`${previous.line}\n`, key);
+    const previousValue = settingValue(previousSetting);
+    if (token && previousValue) {
+      const replacement = previousValue.type === "boolean"
+        ? previousValue.value
+        : token[2].startsWith("'") && !previousValue.value.includes("'")
+        ? `'${previousValue.value}'`
+        : JSON.stringify(previousValue.value);
+      restoredLine = `${setting.line.slice(0, equals + 1)}${token[1]}${replacement}${token[3]}`;
+    }
+  }
   return {
     content: previous?.present
-      ? replaceSetting(content, setting, previous.line)
+      ? replaceSetting(content, setting, restoredLine)
       : `${content.slice(0, setting.index)}${content.slice(setting.end)}`,
     changed: true
   };
@@ -559,6 +581,11 @@ function managedBlockBounds(content) {
 
 function withoutManagedBlock(content, managed) {
   const { start, end } = managed;
+  return `${content.slice(0, start)}${content.slice(end + MANAGED_BLOCK_END.length)}`;
+}
+
+function legacyWithoutManagedBlock(content, managed) {
+  const { start, end } = managed;
   const before = content.slice(0, start).trimEnd();
   const after = content.slice(end + MANAGED_BLOCK_END.length).trimStart();
   const next = [before, after].filter(Boolean).join("\n\n");
@@ -570,7 +597,7 @@ function removeRedundantLegacyBackup(paths, content) {
   try {
     if (!lstatSync(backupPath).isFile()) return false;
     const managed = managedBlockBounds(content);
-    if (!managed || readFileSync(backupPath, "utf8") !== withoutManagedBlock(content, managed)) return false;
+    if (!managed || readFileSync(backupPath, "utf8") !== legacyWithoutManagedBlock(content, managed)) return false;
     rmSync(backupPath);
     return true;
   } catch {
@@ -602,8 +629,7 @@ export function ensureCodexStyleLayer(options = {}) {
     return { active: true, changed, source: "managed", ...paths };
   }
 
-  const prefix = content.trimEnd();
-  const next = `${prefix ? `${prefix}\n\n` : ""}${MANAGED_CODEX_CONTRACT}\n`;
+  const next = `${content}${MANAGED_CODEX_CONTRACT}`;
   writeStyleWithMarker(paths, next);
   return { active: true, changed: true, source: "managed", ...paths };
 }
@@ -614,7 +640,9 @@ export function isCodexStyleLayerActive(options = {}) {
   requireRegularFileOrAbsent(paths.markerPath);
   if (!existsSync(paths.markerPath)) return false;
   const content = readOptionalText(paths.agentsPath);
-  return content.split(MANAGED_CODEX_CONTRACT).length - 1 === 1;
+  const managed = managedBlockBounds(content);
+  return Boolean(managed)
+    && content.slice(managed.start, managed.end + MANAGED_BLOCK_END.length) === MANAGED_CODEX_CONTRACT;
 }
 
 export function removeCodexStyleLayer(options = {}) {
@@ -661,12 +689,22 @@ function sameOwnedPathState(left, right) {
     && left.content.equals(right.content);
 }
 
-function restoreOwnedSnapshots(snapshots, producedStates) {
+function restoreOwnedSnapshots(snapshots, producedStates, paths) {
   const failures = [];
+  let configRollbackConflict = false;
+  const configWasProduced = producedStates.has(paths.codexConfigPath);
   for (const snapshot of snapshots) {
     try {
       const current = ownedPathState(snapshot.path);
       const produced = producedStates.get(snapshot.path);
+      if (snapshot.path === paths.nativeMarkerPath && configRollbackConflict && configWasProduced) {
+        if (current.existed) continue;
+        if (snapshot.existed && produced && sameOwnedPathState(current, produced)) {
+          atomicWrite(snapshot.path, snapshot.content, snapshot.mode);
+          chmodSync(snapshot.path, snapshot.mode);
+        }
+        continue;
+      }
       if (!produced) {
         if (!sameOwnedPathState(current, snapshot)) {
           throw new Error(`Concurrent change preserved during rollback: ${snapshot.path}`);
@@ -684,6 +722,7 @@ function restoreOwnedSnapshots(snapshots, producedStates) {
         chmodSync(snapshot.path, snapshot.mode);
       }
     } catch (error) {
+      if (snapshot.path === paths.codexConfigPath) configRollbackConflict = true;
       failures.push(error);
     }
   }
@@ -707,9 +746,18 @@ function runCodexCommunicationTransaction(
   ].map(snapshotOwnedPath);
   const transaction = {
     producedStates: new Map(),
+    expectedStates: new Map(snapshots.map((snapshot) => [snapshot.path, snapshot])),
+    assertCurrent(path) {
+      const expected = this.expectedStates.get(path);
+      if (expected && !sameOwnedPathState(ownedPathState(path), expected)) {
+        throw new Error(`Concurrent change detected before writing managed path: ${path}`);
+      }
+    },
     record(path, state) {
       if (snapshots.some((snapshot) => snapshot.path === path)) {
-        this.producedStates.set(path, { ...state, path });
+        const produced = { ...state, path };
+        this.producedStates.set(path, produced);
+        this.expectedStates.set(path, produced);
       }
     }
   };
@@ -720,7 +768,7 @@ function runCodexCommunicationTransaction(
   } catch (error) {
     activeOwnedTransaction = null;
     try {
-      restoreOwnedSnapshots(snapshots, transaction.producedStates);
+      restoreOwnedSnapshots(snapshots, transaction.producedStates, paths);
     } catch (rollbackError) {
       throw new AggregateError(
         [error, rollbackError],

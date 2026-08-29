@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
   chmodSync,
   existsSync,
@@ -10,6 +11,7 @@ import {
   symlinkSync,
   writeFileSync
 } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -37,6 +39,26 @@ function fixture() {
     configDir: join(root, "state"),
     codexConfigPath: join(root, "config.toml")
   };
+}
+
+function withConcurrentEditAfterRead(path, readNumber, content, callback) {
+  const originalRead = fs.readFileSync;
+  const originalWrite = fs.writeFileSync;
+  let reads = 0;
+  fs.readFileSync = function patchedRead(candidate, ...args) {
+    const value = originalRead.call(this, candidate, ...args);
+    if (String(candidate) === path && ++reads === readNumber) {
+      originalWrite.call(this, path, content);
+    }
+    return value;
+  };
+  syncBuiltinESMExports();
+  try {
+    return callback();
+  } finally {
+    fs.readFileSync = originalRead;
+    syncBuiltinESMExports();
+  }
 }
 
 test("installs one reversible Codex instruction block and stays idempotent", () => {
@@ -157,6 +179,84 @@ test("style-off rollback preserves a concurrent user edit and reports the rollba
   assert.equal(existsSync(join(paths.configDir, "standard.json")), true);
 });
 
+test("install refuses to overwrite a config edit made after its read", () => {
+  const paths = fixture();
+  const original = 'personality = "pragmatic"\n';
+  const concurrent = 'personality = "none"\nhide_agent_reasoning = true\n';
+  writeFileSync(paths.codexConfigPath, original);
+
+  withConcurrentEditAfterRead(paths.codexConfigPath, 3, concurrent, () => {
+    assert.throws(
+      () => ensureCodexCommunicationLayer(paths),
+      /concurrent change|rollback was incomplete/i
+    );
+  });
+
+  assert.equal(readFileSync(paths.codexConfigPath, "utf8"), concurrent);
+  const nativeMarker = join(paths.configDir, "native-preferences.json");
+  assert.equal(existsSync(nativeMarker), false);
+  assert.equal(removeNativeCodexPreferences(paths).restored, false);
+  assert.equal(readFileSync(paths.codexConfigPath, "utf8"), concurrent);
+  assert.equal(existsSync(nativeMarker), false);
+  assert.equal(existsSync(paths.agentsPath), false);
+});
+
+test("style-off refuses to overwrite an AGENTS edit made after its read", () => {
+  const paths = fixture();
+  ensureNativeCodexPreferences(paths);
+  ensureCodexStyleLayer(paths);
+  const concurrent = "# Concurrent owner edit\n";
+
+  withConcurrentEditAfterRead(paths.agentsPath, 3, concurrent, () => {
+    assert.throws(
+      () => removeCodexCommunicationLayer(paths),
+      /concurrent change|rollback was incomplete/i
+    );
+  });
+
+  assert.equal(readFileSync(paths.agentsPath, "utf8"), concurrent);
+  assert.equal(existsSync(join(paths.configDir, "standard.json")), true);
+  assert.equal(existsSync(join(paths.configDir, "native-preferences.json")), true);
+});
+
+test("install keeps rollback evidence when a concurrent config edit leaves a managed setting", {
+  skip: process.platform === "win32"
+}, () => {
+  const paths = fixture();
+  const agentsDir = join(paths.configDir, "separate-agents-marker-retention");
+  const agentsPath = join(agentsDir, "AGENTS.md");
+  mkdirSync(agentsDir, { recursive: true });
+  writeFileSync(agentsPath, "# User rules\n");
+  writeFileSync(paths.codexConfigPath, 'personality = "pragmatic"\n');
+  const concurrent = 'personality = "none"\nhide_agent_reasoning = true\n';
+  let resolutions = 0;
+  const options = {
+    codexConfigPath: paths.codexConfigPath,
+    configDir: paths.configDir,
+    get agentsPath() {
+      resolutions++;
+      if (resolutions === 3) writeFileSync(paths.codexConfigPath, concurrent);
+      return agentsPath;
+    }
+  };
+  chmodSync(agentsDir, 0o500);
+  try {
+    assert.throws(
+      () => ensureCodexCommunicationLayer(options),
+      /rollback was incomplete|restore every Fable-ous owned path/i
+    );
+  } finally {
+    chmodSync(agentsDir, 0o700);
+  }
+
+  const nativeMarker = join(paths.configDir, "native-preferences.json");
+  assert.equal(readFileSync(paths.codexConfigPath, "utf8"), concurrent);
+  assert.equal(existsSync(nativeMarker), true);
+  assert.equal(removeNativeCodexPreferences(paths).restored, true);
+  assert.equal(readFileSync(paths.codexConfigPath, "utf8"), 'personality = "none"\n');
+  assert.equal(existsSync(nativeMarker), false);
+});
+
 test("installs its exact managed contract even when user instructions look similar", () => {
   const paths = fixture();
   const existing = `# Working agreement
@@ -176,6 +276,22 @@ Never hide failed verification, uncertainty, risk, or authorization boundaries.
   assert.equal(content.split(MANAGED_BLOCK_START).length - 1, 1);
   assert.equal(content.split(MANAGED_BLOCK_END).length - 1, 1);
   assert.equal(isCodexStyleLayerActive(paths), true);
+});
+
+test("managed AGENTS insertion and removal preserve surrounding owner bytes", () => {
+  const inserted = fixture();
+  const original = "  # Owner rules  \n\t ";
+  writeFileSync(inserted.agentsPath, original);
+  ensureCodexStyleLayer(inserted);
+  assert.equal(readFileSync(inserted.agentsPath, "utf8").startsWith(original), true);
+
+  const removed = fixture();
+  const before = "  # Before  \n\t";
+  const after = "  \n  # After\t \n";
+  ensureCodexStyleLayer(removed);
+  writeFileSync(removed.agentsPath, `${before}${MANAGED_CODEX_CONTRACT}${after}`);
+  removeCodexStyleLayer(removed);
+  assert.equal(readFileSync(removed.agentsPath, "utf8"), `${before}${after}`);
 });
 
 test("upgrades an older managed block without duplicating it", () => {
@@ -234,6 +350,15 @@ test("reports a stale or edited managed block as inactive until install repairs 
   assert.equal(isCodexStyleLayerActive(paths), false);
   ensureCodexStyleLayer(paths);
   assert.equal(isCodexStyleLayerActive(paths), true);
+});
+
+test("style status rejects unmatched markers even when one exact contract remains", () => {
+  for (const extra of [MANAGED_BLOCK_START, MANAGED_BLOCK_END]) {
+    const paths = fixture();
+    ensureCodexStyleLayer(paths);
+    writeFileSync(paths.agentsPath, `${readFileSync(paths.agentsPath, "utf8")}${extra}\n`);
+    assert.throws(() => isCodexStyleLayerActive(paths), /malformed Fable-ous block/i);
+  }
 });
 
 test("style status refuses AGENTS.md and marker symlinks", {
@@ -578,11 +703,14 @@ test("style-off restores semantically managed values after harmless TOML reforma
   const original = `personality = "pragmatic"\n`;
   ensureNativeCodexPreferences({ ...paths, existingContent: original });
   const reformatted = readFileSync(paths.codexConfigPath, "utf8")
-    .replace('personality = "friendly"', "personality = 'friendly' # formatted");
+    .replace('personality = "friendly"', "  'personality'  =  'friendly'   # owner format");
   writeFileSync(paths.codexConfigPath, reformatted);
 
   assert.equal(removeNativeCodexPreferences(paths).restored, true);
-  assert.equal(readFileSync(paths.codexConfigPath, "utf8"), original);
+  assert.equal(
+    readFileSync(paths.codexConfigPath, "utf8"),
+    "  'personality'  =  'pragmatic'   # owner format\n"
+  );
 });
 
 test("an unknown preference marker is preserved instead of losing rollback evidence", () => {

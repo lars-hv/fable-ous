@@ -99,7 +99,7 @@ export function commandExists(command, options = {}) {
 
 export function windowsCommandPlan(executable, args, env = process.env) {
   const values = [executable, ...args].map(String);
-  if (values.some((value) => /[\r\n"&|<>^%!()]/u.test(value))) {
+  if (values.some((value) => /[\r\n"&|<>^%!]/u.test(value))) {
     throw new Error("Cannot safely quote a Windows command shim invocation containing command-shell metacharacters.");
   }
   const commandLine = values.map((value) => `"${value}"`).join(" ");
