@@ -1066,13 +1066,15 @@ test("host plugin installation completes before global Codex communication files
   assert.doesNotMatch(installBody, /ensureNativeCodexPreferences\(\)|ensureCodexStyleLayer\(\)/);
 });
 
-test("Windows package verification uses the explicit command-shim plan and runs in CI", () => {
+test("Windows package verification bypasses the recursive npm.cmd shim and runs in CI", () => {
   const checker = readFileSync(new URL("../scripts/check-package.mjs", import.meta.url), "utf8");
   const cli = readFileSync(new URL("../src/cli.mjs", import.meta.url), "utf8");
   const workflow = readFileSync(new URL("../.github/workflows/verify.yml", import.meta.url), "utf8");
   const windowsJob = workflow.slice(workflow.indexOf("  windows-node:"));
 
-  assert.match(checker, /windowsCommandPlan/);
+  assert.match(checker, /process\.env\.npm_execpath/);
+  assert.match(checker, /command:\s*process\.execPath/);
+  assert.match(checker, /args:\s*\[npmExecPath, \.\.\.npmArgs\]/);
   assert.match(checker, /\.\.\.npmPlan\.spawnOptions/);
   assert.match(cli, /\.\.\.plan\.spawnOptions/);
   assert.match(windowsJob, /npm run check:package/);

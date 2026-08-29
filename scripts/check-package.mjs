@@ -10,8 +10,13 @@ import { windowsCommandPlan } from "../src/cli.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
 const npmArgs = ["pack", "--dry-run", "--json", "--ignore-scripts"];
-const npmPlan = process.platform === "win32"
-  ? windowsCommandPlan("npm.cmd", npmArgs)
+const npmExecPath = process.env.npm_execpath;
+const npmPlan = process.platform === "win32" && npmExecPath
+  // npm.cmd is a generated shim. Re-entering it through cmd.exe from an npm script can make the
+  // shim resolve npm-cli.js relative to the project. Invoke npm's actual JS entrypoint instead.
+  ? { command: process.execPath, args: [npmExecPath, ...npmArgs], spawnOptions: { shell: false } }
+  : process.platform === "win32"
+    ? windowsCommandPlan("npm.cmd", npmArgs)
   : { command: "npm", args: npmArgs, spawnOptions: { shell: false } };
 const result = spawnSync(
   npmPlan.command,
