@@ -18,7 +18,9 @@ import {
 import {
   ensureCodexStyleLayer,
   ensureNativeCodexPreferences,
-  MANAGED_CODEX_CONTRACT
+  MANAGED_CODEX_CONTRACT,
+  MANAGED_BLOCK_END,
+  MANAGED_BLOCK_START
 } from "../plugins/fable-ous/scripts/activation.mjs";
 
 const ROOT = new URL("../", import.meta.url);
@@ -453,6 +455,13 @@ test("public install fails before host mutation for unsafe owner-controlled comm
       configContent: Buffer.from([0xff, 0x70, 0x65, 0x72, 0x73, 0x6f, 0x6e, 0x61, 0x6c, 0x69, 0x74, 0x79])
     },
     {
+      name: "UTF-8 BOM config bytes",
+      configContent: Buffer.concat([
+        Buffer.from([0xef, 0xbb, 0xbf]),
+        Buffer.from('personality = "pragmatic"\n')
+      ])
+    },
+    {
       name: "personality table conflict",
       configContent: "[personality]\nvoice = 'calm'\n"
     },
@@ -467,6 +476,10 @@ test("public install fails before host mutation for unsafe owner-controlled comm
     {
       name: "fenced unowned marker example",
       agentsContent: `# Documentation\n\n\`\`\`markdown\n${MANAGED_CODEX_CONTRACT}\n\`\`\`\n`
+    },
+    {
+      name: "unclosed Markdown fence",
+      agentsContent: "# Owner rules\n\n```markdown\nexample still open\n"
     }
   ];
 
@@ -474,7 +487,11 @@ test("public install fails before host mutation for unsafe owner-controlled comm
     const { before, invocationLog, result, watched } = runRejectedCodexInstallPreflight(testCase);
 
     assert.notEqual(result.status, 0, testCase.name);
-    assert.match(result.stderr, /UTF-8|conflicting TOML table|unowned Fable-ous marker/i, testCase.name);
+    assert.match(
+      result.stderr,
+      /UTF-8|BOM|byte-order mark|conflicting TOML table|unowned Fable-ous marker|open Markdown fence/i,
+      testCase.name
+    );
     assert.deepEqual(watched.map((path) => readFileSync(path)), before, testCase.name);
     assert.equal(existsSync(invocationLog), false, `${testCase.name}: Codex was invoked`);
   }
@@ -492,6 +509,10 @@ test("public install and style-off reject a stale legacy marker beside a fenced 
     {
       name: "marker example at byte zero",
       content: `${MANAGED_CODEX_CONTRACT}\n`
+    },
+    {
+      name: "unbound legacy boundary outside a fence",
+      content: `# Owner documentation\n\n<!-- fable-ous:codex-style:boundary -->\n${MANAGED_BLOCK_START}\nUser-owned historical example.\n${MANAGED_BLOCK_END}\n`
     }
   ];
 
@@ -1099,6 +1120,32 @@ test("doctor rejects unmatched AGENTS markers around an exact managed contract",
   writeNativeDoctorState(codexHome);
   const agentsPath = join(codexHome, "AGENTS.md");
   writeFileSync(agentsPath, `${readFileSync(agentsPath, "utf8")}<!-- fable-ous:codex-style:start -->\n`);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "doctor"],
+    { encoding: "utf8", env: { ...process.env, PATH: bin, CODEX_HOME: codexHome } }
+  );
+
+  assert.notEqual(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.nativeMode.durableStyle, false);
+  assert.match(report.nativeMode.error, /safely inspect/i);
+});
+
+test("public doctor rejects a bound style block inside an unclosed Markdown fence", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-doctor-open-fence-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  mkdirSync(bin);
+  mkdirSync(codexHome, { recursive: true });
+  const { entry } = installCodexArtifact(codexHome);
+  writePluginListCommand(join(bin, "codex"), { installed: [entry] });
+  writeNativeDoctorState(codexHome);
+  const agentsPath = join(codexHome, "AGENTS.md");
+  writeFileSync(agentsPath, `# Owner docs\n\n\`\`\`markdown\n${readFileSync(agentsPath, "utf8")}`);
 
   const result = spawnSync(
     process.execPath,

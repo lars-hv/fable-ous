@@ -343,17 +343,20 @@ test("reinstall migrates a provable legacy block after no-final-newline owner co
   assert.equal(readFileSync(paths.agentsPath, "utf8"), original);
 });
 
-test("upgrades an older managed block without duplicating it", () => {
+test("a schema-1 boundary without its byte-exact backup is not migration proof", () => {
   const paths = fixture();
   const old = `\n<!-- fable-ous:codex-style:boundary -->\n${MANAGED_BLOCK_START}\nOld contract.\n${MANAGED_BLOCK_END}\n`;
   writeStyleMarker(paths);
-  ensureCodexStyleLayer({ ...paths, existingContent: old });
-  const content = readFileSync(paths.agentsPath, "utf8");
 
-  assert.equal(content.split(MANAGED_BLOCK_START).length - 1, 1);
-  assert.doesNotMatch(content, /Old contract/);
-  assert.match(content, /controls wording and presentation only/i);
-  assert.doesNotMatch(content, /continue through safe|do not end while/i);
+  assert.throws(
+    () => ensureCodexStyleLayer({ ...paths, existingContent: old }),
+    /byte-exact AGENTS\.md backup/i
+  );
+  assert.equal(existsSync(paths.agentsPath), false);
+  assert.equal(
+    readFileSync(join(paths.configDir, "standard.json"), "utf8"),
+    '{"schema":1,"source":"managed"}\n'
+  );
 });
 
 test("refuses malformed managed markers without appending a duplicate contract", () => {
@@ -459,27 +462,20 @@ test("install never creates a full AGENTS.md backup containing user instructions
 test("a failed AGENTS write removes or restores only the marker written by that attempt", {
   skip: process.platform === "win32"
 }, () => {
-  for (const originalMarker of [null, '{"schema":1,"source":"managed"}\n']) {
-    const paths = fixture();
-    const locked = join(paths.configDir, "locked");
-    paths.agentsPath = join(locked, "AGENTS.md");
-    mkdirSync(locked, { recursive: true });
-    if (originalMarker !== null) {
-      writeFileSync(join(paths.configDir, "standard.json"), originalMarker);
-    }
-    chmodSync(locked, 0o500);
-    try {
-      assert.throws(
-        () => ensureCodexStyleLayer(paths),
-        /permission denied|EACCES/i
-      );
-      const markerPath = join(paths.configDir, "standard.json");
-      if (originalMarker === null) assert.equal(existsSync(markerPath), false);
-      else assert.equal(readFileSync(markerPath, "utf8"), originalMarker);
-      assert.equal(existsSync(paths.agentsPath), false);
-    } finally {
-      chmodSync(locked, 0o700);
-    }
+  const paths = fixture();
+  const locked = join(paths.configDir, "locked");
+  paths.agentsPath = join(locked, "AGENTS.md");
+  mkdirSync(locked, { recursive: true });
+  chmodSync(locked, 0o500);
+  try {
+    assert.throws(
+      () => ensureCodexStyleLayer(paths),
+      /permission denied|EACCES/i
+    );
+    assert.equal(existsSync(join(paths.configDir, "standard.json")), false);
+    assert.equal(existsSync(paths.agentsPath), false);
+  } finally {
+    chmodSync(locked, 0o700);
   }
 });
 

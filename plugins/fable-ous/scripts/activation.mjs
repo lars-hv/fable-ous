@@ -121,6 +121,17 @@ function readOptionalText(path) {
   }
 }
 
+function assertBomFreeCodexConfig(content, path) {
+  if (content.startsWith("\uFEFF")) {
+    throw new Error(`Cannot safely update BOM-bearing Codex config: ${path}`);
+  }
+  return content;
+}
+
+function readOptionalCodexConfig(path) {
+  return assertBomFreeCodexConfig(readOptionalText(path), path);
+}
+
 function readJson(path) {
   let content;
   try {
@@ -444,9 +455,9 @@ function readStyleMarker(paths) {
   return marker;
 }
 
-function managedBlockIsInsideFence(content, managed) {
+function markdownPositionIsInsideFence(content, position) {
   let fence = null;
-  for (const line of content.slice(0, managed.start).split(/\r?\n/u)) {
+  for (const line of content.slice(0, position).split(/\r?\n/u)) {
     const candidate = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
     if (!candidate) continue;
     const marker = candidate[1];
@@ -467,10 +478,13 @@ function styleOwnership(paths, content, managed, options = {}) {
   const marker = readStyleMarker(paths);
   if (!marker) return { owned: false, marker: null };
   if (!managed) {
-    if (marker.schema === 2 && !options.allowOrphanMarker) {
+    if (!options.allowOrphanMarker) {
       throw new Error("Cannot safely update a style marker that is not bound to AGENTS.md content.");
     }
     return { owned: true, legacy: marker.schema === 1, marker };
+  }
+  if (markdownPositionIsInsideFence(content, managed.start)) {
+    throw new Error("Cannot safely update a Fable-ous block inside an open Markdown fence.");
   }
   if (marker.schema === 2) {
     if (managed.binding !== marker.binding) {
@@ -479,10 +493,8 @@ function styleOwnership(paths, content, managed, options = {}) {
     return { owned: true, binding: marker.binding, legacy: false, marker };
   }
   const legacyBackup = provableLegacyBackup(paths, content, managed);
-  const safeLegacy = Boolean(legacyBackup)
-    || (managed.boundary === "legacy" && !managedBlockIsInsideFence(content, managed));
-  if (!safeLegacy) {
-    throw new Error("Cannot safely update an unbound legacy Fable-ous marker in AGENTS.md.");
+  if (!legacyBackup) {
+    throw new Error("Cannot safely migrate an unbound legacy Fable-ous marker without its byte-exact AGENTS.md backup.");
   }
   return { owned: true, legacy: true, legacyBackup, marker };
 }
@@ -498,11 +510,16 @@ export function assertSafeCodexCommunicationPaths(options = {}, safety = {}) {
   const ownership = styleOwnership(paths, agentsContent, managed, {
     allowOrphanMarker: safety.allowOrphanStyleMarker
   });
+  if (!managed
+    && !safety.allowOpenFenceWithoutManaged
+    && markdownPositionIsInsideFence(agentsContent, agentsContent.length)) {
+    throw new Error("Cannot safely install Fable-ous inside an open Markdown fence in AGENTS.md.");
+  }
   if (managed && !ownership.owned && !safety.allowUnownedStyleMarkers) {
     throw new Error("Cannot safely update an unowned Fable-ous marker example in AGENTS.md.");
   }
 
-  const configContent = readOptionalText(paths.codexConfigPath);
+  const configContent = readOptionalCodexConfig(paths.codexConfigPath);
   const markerExists = existsSync(paths.nativeMarkerPath);
   const marker = markerExists ? readJson(paths.nativeMarkerPath) : null;
   if (markerExists && !validNativeMarker(marker)) {
@@ -535,7 +552,8 @@ export function ensureNativeCodexPreferences(options = {}) {
   requireRegularFileOrAbsent(paths.codexConfigPath);
   requireRegularFileOrAbsent(paths.nativeMarkerPath);
   const existed = existsSync(paths.codexConfigPath);
-  let content = options.existingContent ?? readOptionalText(paths.codexConfigPath);
+  let content = options.existingContent ?? readOptionalCodexConfig(paths.codexConfigPath);
+  content = assertBomFreeCodexConfig(content, paths.codexConfigPath);
   const markerExists = existsSync(paths.nativeMarkerPath);
   const existingMarker = readJson(paths.nativeMarkerPath);
   const validOriginal = validNativeMarker(existingMarker);
@@ -581,7 +599,7 @@ export function isNativeCodexPreferencesActive(options = {}) {
   requireRegularFileOrAbsent(paths.nativeMarkerPath);
   if (!existsSync(paths.nativeMarkerPath)) return false;
   if (!validNativeMarker(readJson(paths.nativeMarkerPath))) return false;
-  const content = readOptionalText(paths.codexConfigPath);
+  const content = readOptionalCodexConfig(paths.codexConfigPath);
   return Object.entries(NATIVE_CODEX_PREFERENCES).every(([key, value]) => {
     const setting = findTopLevelSetting(content, key);
     return settingHasDesiredValue(setting, value);
@@ -590,7 +608,7 @@ export function isNativeCodexPreferencesActive(options = {}) {
 
 export function nativeCodexPreferenceValues(options = {}) {
   const paths = resolvePaths(options);
-  const content = readOptionalText(paths.codexConfigPath);
+  const content = readOptionalCodexConfig(paths.codexConfigPath);
   return Object.fromEntries(Object.keys(NATIVE_CODEX_PREFERENCES).map((key) => {
     const parsed = settingValue(findTopLevelSetting(content, key));
     return [key, parsed?.value ?? "unset"];
@@ -606,7 +624,7 @@ export function removeNativeCodexPreferences(options = {}) {
     return { restored: false, markerPreserved: existsSync(paths.nativeMarkerPath), ...paths };
   }
 
-  let content = readOptionalText(paths.codexConfigPath);
+  let content = readOptionalCodexConfig(paths.codexConfigPath);
   let changed = false;
   for (const [key, value] of Object.entries({
     ...NATIVE_CODEX_PREFERENCES,
@@ -706,6 +724,9 @@ export function ensureCodexStyleLayer(options = {}) {
   const ownership = styleOwnership(paths, content, managed);
   if (managed && !ownership.owned) {
     throw new Error("Cannot safely update an unowned Fable-ous marker example in AGENTS.md.");
+  }
+  if (!managed && markdownPositionIsInsideFence(content, content.length)) {
+    throw new Error("Cannot safely install Fable-ous inside an open Markdown fence in AGENTS.md.");
   }
   const binding = ownership.binding || randomBytes(16).toString("hex");
   const marker = { schema: 2, source: "managed", binding };
@@ -906,6 +927,7 @@ export function removeCodexCommunicationLayer(options = {}) {
     return { style, nativePreferences };
   }, "Fable-ous style-off failed and its owned-file rollback was incomplete.", {
     allowUnownedStyleMarkers: true,
-    allowOrphanStyleMarker: true
+    allowOrphanStyleMarker: true,
+    allowOpenFenceWithoutManaged: true
   });
 }
