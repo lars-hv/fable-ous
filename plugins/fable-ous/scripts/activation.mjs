@@ -585,6 +585,10 @@ function managedBlockBounds(content) {
   return { start, end, removalStart };
 }
 
+function managedBlockNeedsBoundary(content, managed) {
+  return managed.start > 0 && !/[\r\n]/u.test(content[managed.start - 1]);
+}
+
 function withoutManagedBlock(content, managed) {
   const { end, removalStart = managed.start } = managed;
   return `${content.slice(0, removalStart)}${content.slice(end + MANAGED_BLOCK_END.length)}`;
@@ -622,9 +626,10 @@ export function ensureCodexStyleLayer(options = {}) {
   if (managed) {
     const { start: managedStart, end: managedEnd } = managed;
     const oldBlock = content.slice(managedStart, managedEnd + MANAGED_BLOCK_END.length);
-    const changed = oldBlock !== MANAGED_CODEX_CONTRACT;
+    const needsBoundary = managedBlockNeedsBoundary(content, managed);
+    const changed = oldBlock !== MANAGED_CODEX_CONTRACT || needsBoundary;
     const next = changed
-      ? `${content.slice(0, managedStart)}${MANAGED_CODEX_CONTRACT}${content.slice(managedEnd + MANAGED_BLOCK_END.length)}`
+      ? `${content.slice(0, managedStart)}${needsBoundary ? MANAGED_BLOCK_SEPARATOR : ""}${MANAGED_CODEX_CONTRACT}${content.slice(managedEnd + MANAGED_BLOCK_END.length)}`
       : content;
     if (changed || (options.existingContent !== undefined && !existed)) {
       writeStyleWithMarker(paths, next);
@@ -648,6 +653,7 @@ export function isCodexStyleLayerActive(options = {}) {
   const content = readOptionalText(paths.agentsPath);
   const managed = managedBlockBounds(content);
   return Boolean(managed)
+    && !managedBlockNeedsBoundary(content, managed)
     && content.slice(managed.start, managed.end + MANAGED_BLOCK_END.length) === MANAGED_CODEX_CONTRACT;
 }
 

@@ -308,6 +308,27 @@ test("a no-final-newline owner file keeps the managed block outside Markdown fen
   assert.equal(readFileSync(paths.agentsPath, "utf8"), original);
 });
 
+test("reinstall repairs an older exact block attached to no-final-newline owner content", () => {
+  const paths = fixture();
+  const original = "```text\nowner rules\n```";
+  writeFileSync(paths.agentsPath, `${original}${MANAGED_CODEX_CONTRACT}`);
+  mkdirSync(paths.configDir, { recursive: true });
+  writeFileSync(
+    join(paths.configDir, "standard.json"),
+    `${JSON.stringify({ schema: 1, source: "managed" })}\n`,
+  );
+
+  assert.equal(isCodexStyleLayerActive(paths), false);
+  assert.equal(ensureCodexStyleLayer(paths).changed, true);
+  assert.match(
+    readFileSync(paths.agentsPath, "utf8"),
+    new RegExp(`\\n<!-- fable-ous:codex-style:boundary -->\\n${MANAGED_BLOCK_START}`),
+  );
+
+  removeCodexStyleLayer(paths);
+  assert.equal(readFileSync(paths.agentsPath, "utf8"), original);
+});
+
 test("upgrades an older managed block without duplicating it", () => {
   const paths = fixture();
   const old = `${MANAGED_BLOCK_START}\nOld contract.\n${MANAGED_BLOCK_END}\n`;
