@@ -334,7 +334,9 @@ exit 0
   assert.doesNotMatch(readFileSync(calls, "utf8"), /^plugin (?:install|update|enable) /m);
 });
 
-test("command discovery uses PATH directly and does not require sh", () => {
+test("command discovery uses PATH directly and does not require sh", {
+  skip: process.platform === "win32",
+}, () => {
   const root = mkdtempSync(join(tmpdir(), "fable-ous-path-"));
   const executable = join(root, "codex");
   writeFileSync(executable, "#!/bin/false\n");
