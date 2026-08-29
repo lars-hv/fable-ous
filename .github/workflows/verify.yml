@@ -19,10 +19,40 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: npm ci
+      - run: npm run check
+      - run: bun test test/fable-ous-boundary.proof.test.ts
+      - run: npm run check:package
+      - run: npm audit --audit-level=low
+      - if: github.event_name == 'pull_request'
+        run: git diff --check "$BASE_SHA"...HEAD
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - if: github.event_name == 'push'
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "::error::Cannot verify pushed whitespace without a real before commit."
+            exit 1
+          fi
+          if ! git cat-file -e "$BEFORE^{commit}"; then
+            echo "::error::Push before commit is unavailable; refusing an unbound diff."
+            exit 1
+          fi
+          git diff --check "$BEFORE"..HEAD
+        env:
+          BEFORE: ${{ github.event.before }}
+
+  windows-node:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
       - run: npm ci
       - run: npm run check
       - run: npm run check:package
-      - run: npm audit --audit-level=low
-      - run: git diff --check "origin/$BASE_REF"...HEAD
-        env:
-          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}

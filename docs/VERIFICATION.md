@@ -1,6 +1,6 @@
 # Fable-ous verification
 
-Candidate 0.2.5 is a native-plugin-only release. The separate Focus/Strict Codex SDK client, prompt runner, model launchers, clean-route wrapper, and `@openai/codex-sdk` dependency have been removed.
+Candidate 0.2.6 is a native-plugin-only release. The separate Focus/Strict Codex SDK client, prompt runner, model launchers, clean-route wrapper, and `@openai/codex-sdk` dependency have been removed.
 
 ## Product boundary
 
@@ -25,11 +25,11 @@ The release operator additionally requires:
 - a cachebusted installed plugin whose runtime bytes match the source candidate;
 - fresh-session doctor evidence.
 
-The tests cover reversible instruction installation, native preference installation and restoration, user changes made after installation, the absence of lifecycle hooks, forced Claude output style with coding instructions preserved, CLI installation/update behavior, package boundaries, and the absence of a replacement Codex runtime.
+The tests cover reversible instruction installation without a full `AGENTS.md` backup, native preference installation and restoration, rollback-evidence validation, user changes made after installation, the absence of lifecycle hooks, forced Claude output style with coding instructions preserved, CLI installation/update behavior, installed-artifact binding in Doctor, package boundaries, and the absence of a replacement Codex runtime.
 
 ## Existing model evidence
 
-Earlier Sol runs showed that the communication contract can produce outcome-first answers and that a synthetic coding fixture can move from 1/4 to 4/4 while preserving the test-file SHA-256. Those runs are encouraging code-quality evidence, but some used the removed Focus presentation path and therefore do not prove the 0.2.5 native-plugin experience.
+Earlier Sol runs showed that the communication contract can produce outcome-first answers and that a synthetic coding fixture can move from 1/4 to 4/4 while preserving the test-file SHA-256. Those runs are encouraging code-quality evidence, but some used the removed Focus presentation path and therefore do not prove the 0.2.6 native-plugin experience.
 
 The previous native Codex 0.150.1 / GPT-5.6 Sol xhigh evaluation established a compatibility baseline for the pre-0.2.5 contract:
 
@@ -40,7 +40,9 @@ The previous native Codex 0.150.1 / GPT-5.6 Sol xhigh evaluation established a c
 
 The same coding probe exposed an external-harness confound: Maestro's Stop hook replaced Sol's concise successful final with `NOT VERIFIED` because the isolated fixture was not a tracked Git repository. This did not change the code or test result, but it proved that a separate blocking Stop hook could override Fable-ous presentation. The Maestro 0.47.70 candidate removes that generic completion hook from both clients while retaining action-boundary safety.
 
-That matched A/B passed all 12/12 hard gates on both routes across four code tasks, two diagnoses, two product judgments, two proof judgments, and two irreversible-action boundaries. There were no harness failures. The older Fable contract used 743 final words versus 893 for baseline, a 16.8% reduction, and a randomized blind preference pass selected Fable-ous in 7/12 pairs (58.3%). These are historical baseline results, not measurements of the revised 0.2.5 contract. Its losses showed that word reduction was the wrong primary objective: one answer skipped useful inspection, while another compressed away decisive evidence. The revised contract requires a fresh matched run before any current preference or unchanged-quality claim.
+That matched A/B passed all 12/12 hard gates on both routes across four code tasks, two diagnoses, two product judgments, two proof judgments, and two irreversible-action boundaries. There were no harness failures. The older Fable contract used 743 final words versus 893 for baseline, a 16.8% reduction, and a randomized blind preference pass selected Fable-ous in 7/12 pairs (58.3%). Its losses showed that word reduction was the wrong primary objective: one answer skipped useful inspection, while another compressed away decisive evidence.
+
+The current 0.2.6 communication contract has now completed the same 12-case / 24-arm native run: both routes again passed 12/12 hard gates. Baseline used 890 final-answer words and Fable-ous used 999. An exact Claude Opus 5 blind judge chose Fable-ous 7 times, baseline 3 times, and tied 2, a tie-adjusted 66.7%. That is encouraging but below the 70% improvement gate. A one-sentence evidence-grounding experiment kept both hard gates at 12/12 but scored only 33.3%; the sentence was removed. The release therefore claims compatibility and a communication preference, not proven stable superiority or lower token use.
 
 The revised contract was also tested against the strongest suspected regression: making Sol less likely to inspect useful optional evidence. Three matched baseline runs and three current-Fable runs used the same Codex 0.150.1, GPT-5.6 Sol xhigh, friendly personality, resolved low verbosity, isolated fixture, and prompt. Both routes opened the available customer-context file 0/3 times, while all six final answers remained direct, useful, quiet, and left no obvious explanatory follow-up. Mean final length was 58.0 baseline words and 60.7 Fable words. This rules out an obvious Fable-only suppression in that probe, but the shared zero-inspection floor means it does not prove full equivalence.
 

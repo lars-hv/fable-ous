@@ -1,6 +1,8 @@
 # Fable-ous
 
-Fable-ous makes native Codex feel calmer, warmer, clearer, and more useful to a human. It changes how Codex speaks to you, not how it reasons, writes code, runs tools, tests work, or decides whether a task is complete.
+Fable-ous makes native Codex feel calmer, warmer, clearer, and more useful to a human. It is designed to change communication and presentation, not to improve code quality or replace the host's coding and completion controls.
+
+The boundary is intentionally strict, but model instructions are probabilistic: wording guidance can sometimes influence model behavior. Fable-ous therefore makes no code-quality claim and does not guarantee that coding behavior is bit-for-bit unchanged. Tests, reviews, safety gates, and completion evidence must remain owned by Codex, Claude Code, and the user's existing workflow.
 
 The product is deliberately small: install the plugin, then keep using ordinary `codex`. There is no replacement terminal, SDK client, renderer model, controller, model router, or hidden continuation loop.
 
@@ -31,9 +33,10 @@ Fable-ous uses only supported host controls:
 - native `personality = "friendly"`;
 - native `hide_agent_reasoning = true`;
 - no lifecycle hooks, so Fable-ous contributes no hook-status receipts;
+- a read-only `voice-status` skill that can answer explicit Fable-ous status and troubleshooting questions;
 - a forced Claude Code output style that preserves Claude's coding instructions.
 
-The communication contract asks the working model to understand the practical intent, do all necessary work, explain the result in human terms, make completion clear, include the proof that creates trust, and omit internal process noise. It does not impose a word limit; a complete answer is better than a short vague receipt.
+The communication contract asks the working model to explain host-established results in human terms, make completion status clear, include the proof that creates trust, and omit internal process noise. It does not instruct the model what work to choose or how to perform it. It does not impose a word limit; a complete answer is better than a short vague receipt.
 
 ### The human-usefulness standard
 
@@ -47,15 +50,19 @@ A good handoff lets the user understand five things without asking another quest
 
 This is an internal quality standard, not a fixed receipt format. Tone should feel warm and adult-to-adult; detail should be translated into consequences; length should expand when understanding or trust needs it and contract when it does not.
 
-The installer records only the settings it owns. `fable-ous style-off` restores the prior values when they are still plugin-managed and preserves settings the user changed after installation.
+The installer records only the settings it owns. It does not make a full backup copy of `AGENTS.md`; the owned block and rollback markers are sufficient. `fable-ous style-off` restores the prior values when they are still plugin-managed and preserves settings the user changed after installation.
 
 ## What it does not change
 
-Fable-ous does not change the selected model, reasoning effort, verbosity preference, code path, tools, plugins, hooks, sandbox, approvals, safety rules, tests, or completion judgment.
+Fable-ous does not directly configure the selected model, reasoning effort, verbosity preference, code path, tools, plugins, hooks, sandbox, approvals, safety rules, tests, or completion judgment. Because the style is delivered as model instructions, zero behavioral influence cannot be guaranteed.
 
 Codex itself owns native command, file, search, and tool receipts. The current plugin API cannot hide those receipts. Fable-ous reduces model narration and hides supported reasoning events, but it does not patch or rebuild the Codex interface.
 
 Another installed plugin can still show hook statuses or block and replace a final answer. Fable-ous deliberately does not override another plugin's safety or verification hooks; `fable-ous doctor` reports this boundary.
+
+Doctor binds health to the enabled user installation, expected version, active host cache and source bytes. It reports unhealthy instead of "native-only" when the active Codex or Claude artifact is stale, comes from an unbound path, has lifecycle hooks, contains a replacement SDK client, or has lost valid rollback evidence.
+
+For Codex local-marketplace installs, source binding is intentionally strict: the active `plugin.source.path` and marketplace root must resolve to the plugin bundled with the currently running Fable-ous CLI. This prevents a different same-named local checkout from being reported as the verified release.
 
 Because model language is probabilistic, Fable-ous can guarantee installation and native configuration, not identical wording or personality on every turn. Strong style claims require the matched evaluation in [docs/CLEAN-ROUTE-EVAL.md](docs/CLEAN-ROUTE-EVAL.md), with code and safety as hard gates.
 

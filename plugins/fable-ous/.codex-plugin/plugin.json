@@ -1,7 +1,7 @@
 {
   "name": "fable-ous",
-  "version": "0.2.5+codex.20260829121500",
-  "description": "Calmer native Codex communication without changing coding behavior.",
+  "version": "0.2.6+codex.20260829160721",
+  "description": "Presentation-focused native Codex communication with coding controls left to the host.",
   "author": {
     "name": "Lars"
   },
@@ -17,7 +17,7 @@
   "interface": {
     "displayName": "Fable-ous",
     "shortDescription": "Calmer Codex communication via the Fable-ous installer.",
-    "longDescription": "Run `fable-ous install` once to apply the reversible native Codex communication contract and calm settings. The model, coding harness, tools, safety, evidence, and authorization boundaries remain unchanged.",
+    "longDescription": "Run `fable-ous install` once to apply the reversible native Codex communication contract and calm settings. Coding, safety, evidence, and authorization controls remain owned by the host.",
     "developerName": "Lars",
     "category": "Productivity",
     "capabilities": [

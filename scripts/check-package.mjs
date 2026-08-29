@@ -5,13 +5,18 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { windowsCommandPlan } from "../src/cli.mjs";
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const npmArgs = ["pack", "--dry-run", "--json", "--ignore-scripts"];
+const npmPlan = process.platform === "win32"
+  ? windowsCommandPlan("npm.cmd", npmArgs)
+  : { command: "npm", args: npmArgs, spawnOptions: { shell: false } };
 const result = spawnSync(
-  npmCommand,
-  ["pack", "--dry-run", "--json", "--ignore-scripts"],
-  { cwd: ROOT, encoding: "utf8" }
+  npmPlan.command,
+  npmPlan.args,
+  { cwd: ROOT, encoding: "utf8", ...npmPlan.spawnOptions }
 );
 
 if (result.error) throw result.error;
