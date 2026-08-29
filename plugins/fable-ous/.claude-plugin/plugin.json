@@ -1,6 +1,6 @@
 {
   "name": "fable-ous",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Calmer communication for native Codex, with Claude Code compatibility.",
   "author": {
     "name": "Lars"

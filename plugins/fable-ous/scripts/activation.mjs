@@ -14,20 +14,27 @@ export const MANAGED_BLOCK_START = "<!-- fable-ous:codex-style:start -->";
 export const MANAGED_BLOCK_END = "<!-- fable-ous:codex-style:end -->";
 export const NATIVE_CODEX_PREFERENCES = {
   personality: '"friendly"',
-  model_verbosity: '"low"',
   hide_agent_reasoning: "true"
+};
+
+const RETIRED_NATIVE_CODEX_PREFERENCES = {
+  model_verbosity: '"low"'
 };
 
 export const MANAGED_CODEX_CONTRACT = `${MANAGED_BLOCK_START}
 ## Fable-ous communication
 
-Lead with the outcome, judgment, or acknowledgement. Use warm, plain language. Keep routine answers to 40–100 words and at most three short paragraphs. Give one recommendation and why it matters.
+Lead with the outcome, judgment, or acknowledgement. Use warm, plain adult-to-adult language. Give one recommendation and why it matters. Use the length the subject needs; completeness and clarity matter more than shortness.
 
-Respond to the user's likely intent and practical need, not just the literal wording. Keep routine work in the background; speak during execution only when a finding, risk, blocker, required decision, changed direction, or material proof changes what the user needs to know.
+Respond to the user's likely intent and practical need, not just the literal wording. Do the inspection, research, implementation, and verification the task requires. Never reduce necessary work to make the conversation look simpler.
 
-Treat the final answer as the user-visible handoff: make it natural, direct, and complete rather than a process recap or fixed status envelope. Do not repeat client tool receipts, command counts, file reads, or running-job inventories. Preserve failed verification, uncertainty, risk, missing proof, citations, and authorization boundaries. Exact-output requests apply only when they do not conflict with safety or authorization.
+Make every user-facing message earn its place: add a result, decision, changed understanding, material risk, blocker, or proof the user needs. Do not narrate commands, file reads, tool counts, or the full sequence of work. Short progress updates are useful when they change what the user needs to know; required host notices still apply.
 
-This section changes communication only. Brevity does not reduce analysis, coding, testing, verification, or necessary technical work. It does not replace or override coding workflow, tools, hooks, plugins, safety rules, approval boundaries, or completion judgment.
+Treat the final answer as the user-visible handoff, not an internal receipt. It should answer the practical question without forcing a follow-up: what happened, whether the requested outcome is actually finished, what changed for the user and why it matters, and what concrete evidence makes that believable. Include the material caveat or missing proof when one exists. Give one exact next action only when something remains. Use natural prose rather than a fixed status form, and include numbers, filenames, or technical detail only when they materially improve understanding or trust. When installed or customer behavior is part of the outcome, local green checks alone do not prove it is live.
+
+Preserve safety warnings, authorization boundaries, uncertainty, failed verification, citations, and honest limits. Exact-output requests apply only when they do not conflict with safety or authorization.
+
+This section changes communication only. It does not replace or override coding workflow, tools, hooks, plugins, safety rules, approval boundaries, or completion judgment.
 ${MANAGED_BLOCK_END}`;
 
 export function isClaudeHost(env = process.env) {
@@ -50,17 +57,6 @@ function atomicWrite(path, content, mode = 0o600) {
   const temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
   writeFileSync(temporary, content, { encoding: "utf8", mode, flag: "wx" });
   renameSync(temporary, path);
-}
-
-export function hasStrongCodexContract(content = "") {
-  const value = String(content);
-  return [
-    /lead with (?:one|a|the)?\s*(?:clear\s+)?(?:recommendation|outcome|result|judgment)/i,
-    /keep most work in the background|work quietly|speak only when[^.\n]*(?:finding|risk|blocker)/i,
-    /likely intent|practical need|not just the literal wording/i,
-    /warm[^.\n]*plain|plain[^.\n]*warm/i,
-    /never hide[^.\n]*(?:failed|failure|uncertainty|risk|authorization)|preserve[^.\n]*(?:proof|evidence|failed verification)/i
-  ].every((pattern) => pattern.test(value));
 }
 
 function readText(path) {
@@ -135,6 +131,19 @@ function replaceSetting(content, setting, line) {
   return `${content.slice(0, setting.index)}${line}${setting.ending}${content.slice(setting.end)}`;
 }
 
+function restoreManagedSetting(content, key, managedValue, previous) {
+  const setting = findTopLevelSetting(content, key);
+  if (!setting || !settingHasDesiredValue(setting, managedValue)) {
+    return { content, changed: false };
+  }
+  return {
+    content: previous?.present
+      ? replaceSetting(content, setting, previous.line)
+      : `${content.slice(0, setting.index)}${content.slice(setting.end)}`,
+    changed: true
+  };
+}
+
 export function ensureNativeCodexPreferences(options = {}) {
   const paths = resolvePaths(options);
   const existed = existsSync(paths.codexConfigPath);
@@ -149,6 +158,14 @@ export function ensureNativeCodexPreferences(options = {}) {
   }
   const original = validOriginal ? { ...existingMarker.original } : {};
   let changed = false;
+
+  for (const [key, managedValue] of Object.entries(RETIRED_NATIVE_CODEX_PREFERENCES)) {
+    if (!(key in original)) continue;
+    const restored = restoreManagedSetting(content, key, managedValue, original[key]);
+    content = restored.content;
+    changed ||= restored.changed;
+    delete original[key];
+  }
 
   for (const [key, value] of Object.entries(NATIVE_CODEX_PREFERENCES)) {
     const desired = `${key} = ${value}`;
@@ -200,14 +217,14 @@ export function removeNativeCodexPreferences(options = {}) {
 
   let content = readOptionalText(paths.codexConfigPath);
   let changed = false;
-  for (const [key, value] of Object.entries(NATIVE_CODEX_PREFERENCES)) {
-    const setting = findTopLevelSetting(content, key);
-    if (!setting || !settingHasDesiredValue(setting, value)) continue;
-    const previous = marker.original[key];
-    content = previous?.present
-      ? replaceSetting(content, setting, previous.line)
-      : `${content.slice(0, setting.index)}${content.slice(setting.end)}`;
-    changed = true;
+  for (const [key, value] of Object.entries({
+    ...NATIVE_CODEX_PREFERENCES,
+    ...RETIRED_NATIVE_CODEX_PREFERENCES
+  })) {
+    if (!(key in marker.original)) continue;
+    const restored = restoreManagedSetting(content, key, value, marker.original[key]);
+    content = restored.content;
+    changed ||= restored.changed;
   }
 
   if (changed) atomicWrite(paths.codexConfigPath, content);
@@ -219,14 +236,29 @@ function writeMarker(paths, source) {
   atomicWrite(paths.markerPath, `${JSON.stringify({ schema: 1, source })}\n`);
 }
 
+function managedBlockBounds(content) {
+  const startCount = content.split(MANAGED_BLOCK_START).length - 1;
+  const endCount = content.split(MANAGED_BLOCK_END).length - 1;
+  if (startCount !== endCount || startCount > 1) {
+    throw new Error("Cannot safely update a malformed Fable-ous block in AGENTS.md.");
+  }
+  if (startCount === 0) return null;
+  const start = content.indexOf(MANAGED_BLOCK_START);
+  const end = content.indexOf(MANAGED_BLOCK_END);
+  if (end < start) {
+    throw new Error("Cannot safely update a malformed Fable-ous block in AGENTS.md.");
+  }
+  return { start, end };
+}
+
 export function ensureCodexStyleLayer(options = {}) {
   const paths = resolvePaths(options);
   const existed = existsSync(paths.agentsPath);
   const content = options.existingContent ?? readOptionalText(paths.agentsPath);
 
-  const managedStart = content.indexOf(MANAGED_BLOCK_START);
-  const managedEnd = content.indexOf(MANAGED_BLOCK_END);
-  if (managedStart >= 0 && managedEnd >= managedStart) {
+  const managed = managedBlockBounds(content);
+  if (managed) {
+    const { start: managedStart, end: managedEnd } = managed;
     const oldBlock = content.slice(managedStart, managedEnd + MANAGED_BLOCK_END.length);
     const changed = oldBlock !== MANAGED_CODEX_CONTRACT;
     const next = changed
@@ -235,13 +267,6 @@ export function ensureCodexStyleLayer(options = {}) {
     writeMarker(paths, "managed");
     if (changed || (options.existingContent !== undefined && !existed)) atomicWrite(paths.agentsPath, next);
     return { active: true, changed, source: "managed", ...paths };
-  }
-
-  if (hasStrongCodexContract(content)) {
-    if (options.existingContent !== undefined && !existed) atomicWrite(paths.agentsPath, content);
-    const source = "existing";
-    writeMarker(paths, source);
-    return { active: true, changed: false, source, ...paths };
   }
 
   if (existed) {
@@ -260,17 +285,17 @@ export function isCodexStyleLayerActive(options = {}) {
   const paths = resolvePaths(options);
   if (!existsSync(paths.markerPath)) return false;
   const content = readOptionalText(paths.agentsPath);
-  return content.includes(MANAGED_BLOCK_START) || hasStrongCodexContract(content);
+  return content.split(MANAGED_CODEX_CONTRACT).length - 1 === 1;
 }
 
 export function removeCodexStyleLayer(options = {}) {
   const paths = resolvePaths(options);
-  const content = readText(paths.agentsPath);
-  const start = content.indexOf(MANAGED_BLOCK_START);
-  const end = content.indexOf(MANAGED_BLOCK_END);
+  const content = readOptionalText(paths.agentsPath);
+  const managed = managedBlockBounds(content);
   let removed = false;
 
-  if (start >= 0 && end >= start) {
+  if (managed) {
+    const { start, end } = managed;
     const before = content.slice(0, start).trimEnd();
     const after = content.slice(end + MANAGED_BLOCK_END.length).trimStart();
     const next = [before, after].filter(Boolean).join("\n\n");

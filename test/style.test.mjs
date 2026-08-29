@@ -17,6 +17,7 @@ test("accepts compact outcome-first prose", () => {
   assert.deepEqual(issues, []);
 });
 
-test("flags long routine answers", () => {
-  assert.equal(analyzeStyle(Array.from({ length: 121 }, () => "ord").join(" "))[0].code, "too-long");
+test("does not treat length alone as a style failure", () => {
+  const issues = analyzeStyle(Array.from({ length: 300 }, () => "nyttig").join(" "));
+  assert.deepEqual(issues, []);
 });

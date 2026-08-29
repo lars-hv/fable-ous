@@ -1,6 +1,6 @@
 {
   "name": "fable-ous",
-  "version": "0.2.4+codex.20260829090933",
+  "version": "0.2.5+codex.20260829121500",
   "description": "Calmer native Codex communication without changing coding behavior.",
   "author": {
     "name": "Lars"
@@ -25,7 +25,7 @@
     ],
     "defaultPrompt": [
       "Give me the direct recommendation and why it matters.",
-      "Continue autonomously until a real decision is required.",
+      "Tell me naturally whether the requested outcome is finished and what proves it.",
       "Explain this plainly without process narration."
     ]
   }

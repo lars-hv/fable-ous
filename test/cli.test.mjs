@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { claudeInstallPlan, parseArgs } from "../src/cli.mjs";
+import { claudeInstallPlan, claudePluginEnabled, parseArgs } from "../src/cli.mjs";
 
 const ROOT = new URL("../", import.meta.url);
 
@@ -37,7 +37,7 @@ test("public onboarding keeps ordinary Codex as the product entrypoint", () => {
 test("npm metadata is publishable and contains no replacement Codex runtime", () => {
   const packageJson = JSON.parse(readFileSync(new URL("package.json", ROOT), "utf8"));
 
-  assert.equal(packageJson.version, "0.2.4");
+  assert.equal(packageJson.version, "0.2.5");
   assert.notEqual(packageJson.private, true);
   assert.equal(packageJson.bin["fable-ous"], "bin/fable-ous.mjs");
   assert.equal(packageJson.dependencies?.["@openai/codex-sdk"], undefined);
@@ -45,6 +45,21 @@ test("npm metadata is publishable and contains no replacement Codex runtime", ()
   assert.match(packageJson.scripts.prepublishOnly, /npm run check/);
   assert.match(packageJson.scripts.prepublishOnly, /validate:plugins/);
   assert.match(packageJson.scripts.prepublishOnly, /check:package/);
+});
+
+test("portable plugin metadata stays version-aligned and hook-free", () => {
+  const packageJson = JSON.parse(readFileSync(new URL("package.json", ROOT), "utf8"));
+  const codexPlugin = JSON.parse(readFileSync(new URL("plugins/fable-ous/.codex-plugin/plugin.json", ROOT), "utf8"));
+  const claudePlugin = JSON.parse(readFileSync(new URL("plugins/fable-ous/.claude-plugin/plugin.json", ROOT), "utf8"));
+  const claudeMarketplace = JSON.parse(readFileSync(new URL(".claude-plugin/marketplace.json", ROOT), "utf8"));
+  const codexMarketplace = JSON.parse(readFileSync(new URL(".agents/plugins/marketplace.json", ROOT), "utf8"));
+
+  assert.match(codexPlugin.version, new RegExp(`^${packageJson.version.replaceAll(".", "\\.")}\\+codex\\.`));
+  assert.equal(claudePlugin.version, packageJson.version);
+  assert.equal(claudeMarketplace.plugins[0].version, packageJson.version);
+  assert.equal(codexMarketplace.plugins[0].name, codexPlugin.name);
+  assert.equal(existsSync(new URL("plugins/fable-ous/hooks/hooks.json", ROOT)), false);
+  assert.equal(existsSync(new URL("plugins/fable-ous/scripts/hook.mjs", ROOT)), false);
 });
 
 test("Claude upgrade uses update for an existing Fable-ous installation", () => {
@@ -62,6 +77,17 @@ test("Claude first install uses install", () => {
   );
 });
 
+test("Claude status requires the exact enabled plugin instead of a text match", () => {
+  assert.equal(claudePluginEnabled(JSON.stringify([
+    { id: "fable-ous@fable-ous", enabled: true }
+  ])), true);
+  assert.equal(claudePluginEnabled(JSON.stringify([
+    { id: "fable-ous@fable-ous", enabled: false },
+    { id: "another@market", description: "mentions fable-ous" }
+  ])), false);
+  assert.equal(claudePluginEnabled("not-json"), false);
+});
+
 test("the CLI source does not expose model or client launchers", () => {
   const source = readFileSync(new URL("src/cli.mjs", ROOT), "utf8");
   assert.doesNotMatch(source, /createStrictSession|runStrictTurn|launchClaude|claudeLaunchPlan/);
@@ -72,6 +98,6 @@ test("host plugin installation completes before global Codex communication files
   const source = readFileSync(new URL("src/cli.mjs", ROOT), "utf8");
   const installBody = source.slice(source.indexOf("function install(options)"), source.indexOf("function styleOff()"));
   assert.ok(installBody.indexOf('run("claude", claudeInstallPlan(installed))') < installBody.indexOf("ensureCodexStyleLayer()"));
-  assert.ok(installBody.indexOf("ensureCodexStyleLayer()") < installBody.indexOf("ensureNativeCodexPreferences()"));
+  assert.ok(installBody.indexOf("ensureNativeCodexPreferences()") < installBody.indexOf("ensureCodexStyleLayer()"));
   assert.match(installBody, /catch \(error\)[\s\S]*removeNativeCodexPreferences\(\)[\s\S]*removeCodexStyleLayer\(\)/);
 });

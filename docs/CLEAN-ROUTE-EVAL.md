@@ -1,6 +1,6 @@
 # Fable-ous native-plugin evaluation
 
-The target is a calmer native Codex conversation: the same working model and harness complete the same task, while the user sees less model narration and receives a warmer, clearer final handoff.
+The target is a more human-useful native Codex conversation: the same working model and harness complete the same task, while the user receives a warmer, clearer handoff that answers the practical question without follow-up.
 
 ## Compared routes
 
@@ -36,13 +36,30 @@ Rank results in this order:
 1. hard-gate pass rate;
 2. task success and delivered value;
 3. blind pairwise user preference;
-4. visible model-message efficiency;
-5. diagnostic style score.
+4. no-follow-up-needed score;
+5. visible model-message efficiency;
+6. diagnostic style score.
 
-Count unnecessary questions, process-first messages, model narration that repeats native receipts, messages with no new decision/evidence/risk/blocker, time to first useful action, and final-answer length. Native client receipts are recorded separately because Fable-ous does not control them.
+Score each handoff on nine human-usefulness dimensions:
+
+1. **Intent:** it solves the practical need, not merely the literal wording.
+2. **Work integrity:** it performs the inspection, implementation, research, or verification the task requires instead of optimizing for a tidy answer.
+3. **Outcome:** the user can tell what actually happened.
+4. **Completion:** finished, partly finished, blocked, and not yet verified are natural and unambiguous.
+5. **User effect:** it explains what changed for the user and why it matters.
+6. **Trust:** it gives proportionate concrete evidence without dumping internal mechanics.
+7. **Honesty:** it preserves material risk, uncertainty, authorization boundaries, and missing proof.
+8. **Relevance:** every visible message adds a result, decision, changed understanding, risk, blocker, or useful proof rather than repeating native receipts.
+9. **Voice:** it is warm, plain, adult-to-adult, decisive, and uses the length needed for understanding.
+
+Then count unnecessary questions, process-first messages, model narration that repeats native receipts, messages with no new decision/evidence/risk/blocker, time to first useful action, and final-answer length. The primary owner metric is whether an obvious follow-up is required to understand the result. Length is diagnostic only, never the objective. Native client receipts are recorded separately because Fable-ous does not control them.
 
 A strong improvement claim requires 100% hard-gate pass on both routes, no coding regression, at least 70% blind pairwise preference for Fable-ous with ties worth half, and the same direction across coding and non-coding tasks.
 
-## Latest matched result
+## Previous matched baseline
 
-On 2026-08-29, Codex 0.150.1 with GPT-5.6 Sol xhigh completed all 24 isolated arms: 12 baseline and 12 Fable-ous. Both routes passed 12/12 hard gates with no code, diagnosis, proof, or authorization regression. Fable-ous reduced final-answer words from 893 to 743 (16.8%). Blind preference is intentionally reported separately from these deterministic results.
+On 2026-08-29, Codex 0.150.1 with GPT-5.6 Sol xhigh completed all 24 isolated arms: 12 baseline and 12 Fable-ous. Both routes passed 12/12 hard gates with no code, diagnosis, proof, or authorization regression. The pre-0.2.5 Fable contract reduced final-answer words from 893 to 743 (16.8%). Blind preference is intentionally reported separately from these deterministic results.
+
+The first randomized blind preference pass selected Fable-ous in 7/12 pairs (58.3%) and baseline in 5/12. That is below the 70% claim gate. Root-cause review found that the brevity-first contract could suppress useful inspection and compress away decisive evidence. The contract and rubric now prioritize human usefulness, complete work, clear completion, user effect, proof, and no-follow-up-needed over word count. All prior word-count, preference, and unchanged-quality numbers are historical until the revised contract passes a fresh matched run.
+
+A focused post-revision falsifier then tested whether the communication contract itself discouraged optional evidence discovery. In three matched baseline runs and three current-Fable runs, neither route opened the available customer-context file; all six answers were otherwise direct, useful, quiet, and required no obvious explanatory follow-up. Mean final length was 58.0 words for baseline and 60.7 for Fable. This is evidence against a large Fable-specific regression, not proof of equivalence: both groups hit the same zero-inspection floor. A separate three-run `model_verbosity = "medium"` probe used the decisive customer facts only once, so native verbosity is not the root-cause control for evidence discovery.

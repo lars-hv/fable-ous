@@ -44,7 +44,7 @@ function run(command, args) {
   if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed`);
 }
 
-export function claudeInstallPlan(pluginListJson = "[]") {
+function parseClaudePluginList(pluginListJson = "[]") {
   let plugins = [];
   try {
     const parsed = JSON.parse(String(pluginListJson || "[]"));
@@ -53,7 +53,19 @@ export function claudeInstallPlan(pluginListJson = "[]") {
     // Let Claude report a concrete install error instead of claiming an
     // upgrade from an unreadable plugin list.
   }
-  const installed = plugins.some((plugin) => plugin?.id === "fable-ous@fable-ous");
+  return plugins;
+}
+
+export function claudePluginEnabled(pluginListJson = "[]") {
+  return parseClaudePluginList(pluginListJson).some(
+    (plugin) => plugin?.id === "fable-ous@fable-ous" && plugin?.enabled === true
+  );
+}
+
+export function claudeInstallPlan(pluginListJson = "[]") {
+  const installed = parseClaudePluginList(pluginListJson).some(
+    (plugin) => plugin?.id === "fable-ous@fable-ous"
+  );
   return installed
     ? ["plugin", "update", "fable-ous@fable-ous", "--scope", "user"]
     : ["plugin", "install", "fable-ous@fable-ous", "--scope", "user"];
@@ -84,8 +96,8 @@ function install(options) {
   let style;
   let nativePreferences;
   try {
-    style = ensureCodexStyleLayer();
     nativePreferences = ensureNativeCodexPreferences();
+    style = ensureCodexStyleLayer();
   } catch (error) {
     if (!nativePreferencesWereActive) removeNativeCodexPreferences();
     if (!styleWasActive) removeCodexStyleLayer();
@@ -112,7 +124,6 @@ function doctor() {
     codex: { available: commandExists("codex"), installed: false },
     claude: { available: commandExists("claude"), installed: false },
     config: {
-      modelVerbosity: "unset",
       personality: "unset",
       hideAgentReasoning: "unset"
     },
@@ -147,7 +158,7 @@ function doctor() {
   if (result.claude.available) {
     try {
       const output = execFileSync("claude", ["plugin", "list", "--json"], { encoding: "utf8" });
-      result.claude.installed = output.includes("fable-ous");
+      result.claude.installed = claudePluginEnabled(output);
     } catch {
       result.claude.error = "Could not read Claude plugins.";
     }
@@ -157,7 +168,6 @@ function doctor() {
   if (existsSync(configPath)) {
     try {
       const values = nativeCodexPreferenceValues({ codexConfigPath: configPath });
-      result.config.modelVerbosity = values.model_verbosity;
       result.config.personality = values.personality;
       result.config.hideAgentReasoning = values.hide_agent_reasoning;
     } catch {
@@ -187,7 +197,7 @@ Install once, then run Codex normally:
 Commands:
   fable-ous install [--codex-only]
   fable-ous doctor
-  fable-ous style-off
+  fable-ous style-off        Remove only the reversible Codex communication layer
   fable-ous lint < response.txt
 `);
 }

@@ -1,6 +1,6 @@
 {
   "name": "fable-ous",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Calmer native Codex communication, with Claude Code compatibility.",
   "author": "Lars",
   "repository": {
@@ -38,8 +38,7 @@
     "codex",
     "claude-code",
     "communication",
-    "output-style",
-    "hooks"
+    "output-style"
   ],
   "license": "MIT"
 }
