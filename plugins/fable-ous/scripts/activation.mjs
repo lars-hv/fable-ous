@@ -13,6 +13,7 @@ import { dirname, join, resolve } from "node:path";
 
 export const MANAGED_BLOCK_START = "<!-- fable-ous:codex-style:start -->";
 export const MANAGED_BLOCK_END = "<!-- fable-ous:codex-style:end -->";
+const MANAGED_BLOCK_SEPARATOR = "\n<!-- fable-ous:codex-style:boundary -->\n";
 export const NATIVE_CODEX_PREFERENCES = {
   personality: '"friendly"',
   hide_agent_reasoning: "true"
@@ -576,17 +577,22 @@ function managedBlockBounds(content) {
   if (end < start) {
     throw new Error("Cannot safely update a malformed Fable-ous block in AGENTS.md.");
   }
-  return { start, end };
+  const separatorStart = start - MANAGED_BLOCK_SEPARATOR.length;
+  const removalStart = separatorStart >= 0
+    && content.slice(separatorStart, start) === MANAGED_BLOCK_SEPARATOR
+    ? separatorStart
+    : start;
+  return { start, end, removalStart };
 }
 
 function withoutManagedBlock(content, managed) {
-  const { start, end } = managed;
-  return `${content.slice(0, start)}${content.slice(end + MANAGED_BLOCK_END.length)}`;
+  const { end, removalStart = managed.start } = managed;
+  return `${content.slice(0, removalStart)}${content.slice(end + MANAGED_BLOCK_END.length)}`;
 }
 
 function legacyWithoutManagedBlock(content, managed) {
-  const { start, end } = managed;
-  const before = content.slice(0, start).trimEnd();
+  const { end, removalStart = managed.start } = managed;
+  const before = content.slice(0, removalStart).trimEnd();
   const after = content.slice(end + MANAGED_BLOCK_END.length).trimStart();
   const next = [before, after].filter(Boolean).join("\n\n");
   return next ? `${next}\n` : "";
@@ -629,7 +635,7 @@ export function ensureCodexStyleLayer(options = {}) {
     return { active: true, changed, source: "managed", ...paths };
   }
 
-  const next = `${content}${MANAGED_CODEX_CONTRACT}`;
+  const next = `${content}${MANAGED_BLOCK_SEPARATOR}${MANAGED_CODEX_CONTRACT}`;
   writeStyleWithMarker(paths, next);
   return { active: true, changed: true, source: "managed", ...paths };
 }

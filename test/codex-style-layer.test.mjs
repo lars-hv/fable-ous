@@ -294,6 +294,20 @@ test("managed AGENTS insertion and removal preserve surrounding owner bytes", ()
   assert.equal(readFileSync(removed.agentsPath, "utf8"), `${before}${after}`);
 });
 
+test("a no-final-newline owner file keeps the managed block outside Markdown fences and restores exact bytes", () => {
+  const paths = fixture();
+  const original = "```text\nowner rules\n```";
+  writeFileSync(paths.agentsPath, original);
+
+  ensureCodexStyleLayer(paths);
+  const installed = readFileSync(paths.agentsPath, "utf8");
+  assert.match(installed, new RegExp(`\\n<!-- fable-ous:codex-style:boundary -->\\n${MANAGED_BLOCK_START}`));
+  assert.doesNotMatch(installed, new RegExp(`\\x60\\x60\\x60${MANAGED_BLOCK_START}`));
+
+  removeCodexStyleLayer(paths);
+  assert.equal(readFileSync(paths.agentsPath, "utf8"), original);
+});
+
 test("upgrades an older managed block without duplicating it", () => {
   const paths = fixture();
   const old = `${MANAGED_BLOCK_START}\nOld contract.\n${MANAGED_BLOCK_END}\n`;
