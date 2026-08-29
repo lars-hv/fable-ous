@@ -1,0 +1,6 @@
+{
+  "name": "fable-ous-invoice-total-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" }
+}

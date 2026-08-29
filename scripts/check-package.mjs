@@ -52,8 +52,7 @@ const required = [
   "plugins/fable-ous/scripts/activation.mjs",
   "scripts/check-package.mjs",
   "scripts/validate-plugins.mjs",
-  "src/cli.mjs",
-  "src/strict.mjs"
+  "src/cli.mjs"
 ];
 const forbiddenPath = [
   /(^|\/)(test|tests)(\/|$)/i,

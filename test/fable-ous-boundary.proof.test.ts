@@ -1,45 +1,18 @@
 import { expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 
-// Static imports intentionally reach the complete changed control boundary.
-import "../plugins/fable-ous/scripts/hook.mjs";
-import { claudeLaunchPlan } from "../src/cli.mjs";
-import { runStrictTurn } from "../src/strict.mjs";
-
-const hook = new URL("../plugins/fable-ous/scripts/hook.mjs", import.meta.url);
-
-test("Codex per-turn hooks emit no visible body", () => {
-  const prompt = spawnSync(process.execPath, [hook.pathname, "prompt-submit"], {
-    input: JSON.stringify({ prompt: "Bør vi bygge dette?" }),
-    encoding: "utf8"
-  });
-  const stop = spawnSync(process.execPath, [hook.pathname, "stop"], {
-    input: JSON.stringify({ last_assistant_message: "Status: done" }),
-    encoding: "utf8"
-  });
-  expect(prompt.status).toBe(0);
-  expect(stop.status).toBe(0);
-  expect(prompt.stdout).toBe("");
-  expect(stop.stdout).toBe("");
+test("Fable-ous contributes no lifecycle-hook receipts", () => {
+  const root = new URL("../", import.meta.url);
+  expect(existsSync(new URL("plugins/fable-ous/hooks/hooks.json", root))).toBe(false);
+  expect(existsSync(new URL("plugins/fable-ous/scripts/hook.mjs", root))).toBe(false);
 });
 
-test("Focus returns one natural working-model final without a controller or renderer", async () => {
-  const calls: unknown[][] = [];
-  const result = await runStrictTurn({
-    mainThread: {
-      run: async (...args: unknown[]) => {
-        calls.push(args);
-        return { finalResponse: "Direkte svar.", usage: null };
-      }
-    },
-    createRendererThread: () => {
-      throw new Error("renderer must not be created");
-    },
-    prompt: "Svar direkte."
-  } as never);
+test("Fable-ous stays inside the native plugin boundary", () => {
+  const root = new URL("../", import.meta.url);
+  const packageJson = JSON.parse(readFileSync(new URL("package.json", root), "utf8"));
+  const cli = readFileSync(new URL("src/cli.mjs", root), "utf8");
 
-  expect(result.answer).toBe("Direkte svar.");
-  expect(result.revised).toBe(false);
-  expect(calls).toEqual([["Svar direkte."]]);
-  expect(claudeLaunchPlan(["--model=claude-opus-5"]).env).toEqual({});
+  expect(existsSync(new URL("src/strict.mjs", root))).toBe(false);
+  expect(packageJson.dependencies?.["@openai/codex-sdk"]).toBeUndefined();
+  expect(cli).not.toMatch(/createStrictSession|runStrictTurn|launchClaude/);
 });

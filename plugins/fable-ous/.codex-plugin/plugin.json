@@ -1,7 +1,7 @@
 {
   "name": "fable-ous",
-  "version": "0.2.3+codex.20260828114734",
-  "description": "Outcome-first, concise, proactive communication for Codex.",
+  "version": "0.2.4+codex.20260829090933",
+  "description": "Calmer native Codex communication without changing coding behavior.",
   "author": {
     "name": "Lars"
   },
@@ -16,8 +16,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Fable-ous",
-    "shortDescription": "Make Codex communicate with clarity and judgment.",
-    "longDescription": "Fable-ous gives Codex an outcome-first, concise, proactive communication style while preserving safety, evidence, and authorization boundaries.",
+    "shortDescription": "Calmer Codex communication via the Fable-ous installer.",
+    "longDescription": "Run `fable-ous install` once to apply the reversible native Codex communication contract and calm settings. The model, coding harness, tools, safety, evidence, and authorization boundaries remain unchanged.",
     "developerName": "Lars",
     "category": "Productivity",
     "capabilities": [

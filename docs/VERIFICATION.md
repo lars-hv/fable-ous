@@ -1,45 +1,53 @@
 # Fable-ous verification
 
-Candidate 0.2.3 was prepared on 2026-08-28 with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Claude Code 2.1.246, Node.js 24.16.0, and macOS.
+Candidate 0.2.4 is a native-plugin-only release. The separate Focus/Strict Codex SDK client, prompt runner, model launchers, clean-route wrapper, and `@openai/codex-sdk` dependency have been removed.
 
-## Current architecture boundary
+## Product boundary
 
-Fable-ous is a communication layer. Focus Mode performs exactly one normal working-model turn and returns its latest natural final answer. It does not request a structured state envelope, auto-continue the thread, classify command failures, append caveats, disable hooks, or run a renderer model.
+Fable-ous shapes communication through the normal Codex instruction stack and supported native settings. It does not own the terminal stream, start a second client, route work, auto-continue, classify command truth, change coding instructions, or replace host safety and approval controls.
 
-The working Codex model keeps its normal tools, plugins, lifecycle hooks, safety rules, approval boundaries, and coding workflow. Focus Mode buffers routine commentary and tool mechanics from the visible terminal. A real SDK turn failure exits as an error. Whether code is correct or work is complete remains the responsibility of Codex and the host's existing controls, not a second Fable-ous controller.
+The installer applies three reversible native preferences:
 
-## Deterministic evidence
+- `personality = "friendly"`
+- `model_verbosity = "low"`
+- `hide_agent_reasoning = true`
 
-- The complete Node test and syntax suite passes: 34/34 tests.
-- The Bun customer-boundary proof passes: 2/2 tests with 8 assertions.
-- Both plugin validators pass.
-- `npm audit` reports zero vulnerabilities.
-- `git diff --check` is clean.
-- Focus Mode is the default CLI route; `strict` remains a backwards-compatible alias.
-- The publish gate runs the complete check, both plugin validators, and a package-content allowlist before npm can publish.
-- Tests prove that Focus calls the working model once without an output schema, ignores raw command and file events, returns the latest natural model message unchanged, preserves authorization language, and surfaces real turn failures.
-- Tests prove that Fable-ous does not override Codex features, hooks, sandbox, or approval defaults and that its installed communication contract explicitly leaves coding workflow and completion judgment to the host.
-- The installer upgrades an older managed instruction block in place, remains idempotent, and removes only its own block on uninstall.
-- Codex has no per-prompt or Stop hook. Claude forces the Fable-ous output style while preserving coding instructions.
+These settings and the voice contract affect presentation. Model choice, reasoning effort, tools, plugins, hooks, sandbox, approvals, coding, testing, verification, and completion judgment remain native Codex responsibilities.
 
-The packed 0.2.3 candidate was installed without `npm link` into isolated Codex roots. Doctor reported the durable style active and per-turn hooks silent; the installed plugin cache was byte-identical to the packed plugin source. The npm publish dry-run contained 23 allowlisted files and preserved the public CLI binary.
+## Deterministic gates
 
-## Live model evidence
+The release gate requires:
 
-Earlier GPT-5.6 Sol development runs proved that the style could produce concise, outcome-first answers and that Sol could move the synthetic coding fixture from 1/4 to 4/4 without changing its test file. Those runs also exposed the decisive design flaw in the earlier controller: Fable-ous sometimes appended a false failure caveat after Sol had recovered a red test and reached 4/4.
+- complete Node syntax and test suite;
+- Bun native-plugin boundary proof;
+- Codex and Claude plugin validators;
+- zero dependency vulnerabilities;
+- clean `git diff --check`;
+- allowlisted npm package contents;
+- a cachebusted installed plugin whose runtime bytes match the source candidate;
+- fresh-session doctor evidence.
 
-Candidate 0.2.3 removes that controller mechanism instead of adding more command-classification patches. A fresh packed-candidate Sol style probe returned one direct recommendation, one reason, and one concrete next action in three short paragraphs.
+The tests cover reversible instruction installation, native preference installation and restoration, user changes made after installation, the absence of lifecycle hooks, forced Claude output style with coding instructions preserved, CLI installation/update behavior, package boundaries, and the absence of a replacement Codex runtime.
 
-On the tracked synthetic coding fixture, packed-candidate Sol moved from 1/4 to 4/4 and preserved the test-file SHA-256 `2bf12d36220ca5628fc004f6786149f1d80a500151312132f6cda6d588d956c2`. Its natural final also reported that Maestro could not persist an external receipt from the configured workspace sandbox. Focus returned that host judgment unchanged; it neither hid the blocker nor appended its own caveat. This is a host-integration limitation, not a failed code oracle.
+## Existing model evidence
 
-No native Fable run is part of this release gate.
+Earlier Sol runs showed that the communication contract can produce short outcome-first answers and that a synthetic coding fixture can move from 1/4 to 4/4 while preserving the test-file SHA-256. Those runs are encouraging code-quality evidence, but some used the removed Focus presentation path and therefore do not prove the 0.2.4 native-plugin experience.
 
-Historical Opus and native-Fable experiments remain development context only. They are not proof of the current 0.2.3 Focus boundary and are not required for publication.
+Fresh native Codex 0.150.1 / GPT-5.6 Sol xhigh evidence for 0.2.4:
 
-## Platform boundary
+- a no-tool product judgment returned one direct recommendation and one concrete next step in two short paragraphs;
+- the finite-average fixture moved from 1/4 to 4/4 tests with a minimal implementation change;
+- the test file remained byte-identical with SHA-256 `2bf12d36220ca5628fc004f6786149f1d80a500151312132f6cda6d588d956c2`;
+- host rerun confirmed 4/4 after the model turn.
 
-OpenAI's standard Codex interface owns its native tool receipts, so the durable instruction layer cannot guarantee a receipt-free standard session. Focus Mode can hide those mechanics because it owns its own terminal presentation, but it intentionally does not suppress or disable the underlying hooks and plugins.
+The same coding probe exposed an external-harness confound: Maestro's Stop hook replaced Sol's concise successful final with `NOT VERIFIED` because the isolated fixture was not a tracked Git repository. This did not change the code or test result, but it proved that a separate blocking Stop hook could override Fable-ous presentation. The Maestro 0.47.70 candidate removes that generic completion hook from both clients while retaining action-boundary safety.
 
-Claude's forced output style is automatic and model-independent, but it cannot cancel another plugin's hooks. The optional `--clean` route isolates the launched Claude process and therefore also omits user/project settings, including permissions, MCP servers, and safety hooks defined there. It remains an explicit opt-in.
+The matched native A/B defined in [CLEAN-ROUTE-EVAL.md](CLEAN-ROUTE-EVAL.md) was then run on Codex 0.150.1 with GPT-5.6 Sol xhigh in isolated fresh homes. Both baseline and Fable-ous passed all 12/12 hard gates across four code tasks, two diagnoses, two product judgments, two proof judgments, and two irreversible-action boundaries. There were no harness failures. Fable-ous finals used 743 words versus 893 for baseline, a 16.8% reduction, while every deterministic code and safety oracle remained equal. This proves no regression on the matched set; blind preference scoring remains a separate experiential measure.
 
-The project does not claim identical Fable personality, universal preference, or compatibility with every future Codex and Claude Code release. A strong public effectiveness claim still requires the blinded holdout defined in `docs/CLEAN-ROUTE-EVAL.md`.
+No native Fable-model run is required because the product changes Sol's communication layer, not its model route.
+
+## Honest limits
+
+The plugin cannot hide native Codex tool receipts, force identical prose on every probabilistic model turn, overrule another plugin's higher-priority hook, or guarantee compatibility with future clients without versioned tests.
+
+Do not claim lower total token use or unchanged code quality from style preference alone. Code correctness, required tests, safety, authorization, and honest completion remain hard gates that style cannot compensate for.

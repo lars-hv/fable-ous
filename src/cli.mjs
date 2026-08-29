@@ -2,23 +2,24 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
-import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 import {
+  ensureNativeCodexPreferences,
   ensureCodexStyleLayer,
+  isNativeCodexPreferencesActive,
   isCodexStyleLayerActive,
+  nativeCodexPreferenceValues,
+  removeNativeCodexPreferences,
   removeCodexStyleLayer
 } from "../plugins/fable-ous/scripts/activation.mjs";
-import { handleHook } from "../plugins/fable-ous/scripts/hook.mjs";
 import { analyzeStyle } from "../plugins/fable-ous/scripts/style.mjs";
-import { createStrictSession, runStrictTurn } from "./strict.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 export function parseArgs(argv) {
   const args = [...argv];
-  const command = args[0] && !args[0].startsWith("-") ? args.shift() : "focus";
+  const command = args[0] && !args[0].startsWith("-") ? args.shift() : "help";
   const options = { _: [] };
   while (args.length) {
     const value = args.shift();
@@ -43,44 +44,14 @@ function run(command, args) {
   if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed`);
 }
 
-export function claudeLaunchPlan(args = [], defaultModel = "") {
-  const clean = args.includes("--clean");
-  const forwarded = args.filter((value) => value !== "--clean");
-  let model = "";
-  const modelIndex = forwarded.findIndex((value) => value === "--model");
-  const inlineModel = forwarded.find((value) => value.startsWith("--model="));
-
-  if (modelIndex >= 0) model = String(forwarded[modelIndex + 1] || "");
-  else if (inlineModel) model = inlineModel.slice("--model=".length);
-  else if (defaultModel) {
-    model = defaultModel;
-    forwarded.unshift("--model", model);
-  }
-
-  if (!model) {
-    throw new Error("Pass --model explicitly, or use `fable-ous opus` / `fable-ous fable`. Fable-ous will not guess on Claude.");
-  }
-
-  if (clean) {
-    forwarded.unshift("--setting-sources", "local", "--plugin-dir", resolve(ROOT, "plugins/fable-ous"));
-  }
-
-  return {
-    args: forwarded,
-    model,
-    clean,
-    env: {}
-  };
-}
-
 export function claudeInstallPlan(pluginListJson = "[]") {
   let plugins = [];
   try {
     const parsed = JSON.parse(String(pluginListJson || "[]"));
     if (Array.isArray(parsed)) plugins = parsed;
   } catch {
-    // A malformed list is treated as a first install; Claude will report a
-    // concrete error instead of letting Fable-ous claim a successful upgrade.
+    // Let Claude report a concrete install error instead of claiming an
+    // upgrade from an unreadable plugin list.
   }
   const installed = plugins.some((plugin) => plugin?.id === "fable-ous@fable-ous");
   return installed
@@ -88,102 +59,20 @@ export function claudeInstallPlan(pluginListJson = "[]") {
     : ["plugin", "install", "fable-ous@fable-ous", "--scope", "user"];
 }
 
-function launchClaude(args, defaultModel = "") {
-  if (!commandExists("claude")) throw new Error("Claude Code is not installed.");
-  const plan = claudeLaunchPlan(args, defaultModel);
-  const result = spawnSync("claude", plan.args, {
-    stdio: "inherit",
-    env: { ...process.env, ...plan.env }
-  });
-  if (result.status !== 0) process.exitCode = result.status ?? 1;
-}
-
-function strictOptions(options) {
-  return {
-    cwd: resolve(String(options.cwd || process.cwd())),
-    ...(options.model ? { model: String(options.model) } : {}),
-    ...(options.effort ? { effort: String(options.effort) } : {}),
-    ...(options.sandbox ? { sandboxMode: String(options.sandbox) } : {}),
-    ...(options.approval ? { approvalPolicy: String(options.approval) } : {})
-  };
-}
-
-async function askOnce(prompt, options) {
-  const session = createStrictSession(strictOptions(options));
-  const result = await runStrictTurn({
-    ...session,
-    prompt,
-    onProgress: (message) => process.stderr.write(`· ${message}\n`)
-  });
-  process.stdout.write(`${result.answer}\n`);
-}
-
-async function interactive(options) {
-  const session = createStrictSession(strictOptions(options));
-  const terminal = createInterface({ input: process.stdin, output: process.stdout });
-  process.stdout.write("Fable-ous · Focus Mode  (/exit to quit)\n\n");
-  try {
-    while (true) {
-      const prompt = (await terminal.question("› ")).trim();
-      if (!prompt) continue;
-      if (prompt === "/exit" || prompt === "/quit") break;
-      const activity = startActivity();
-      let result;
-      try {
-        result = await runStrictTurn({
-          ...session,
-          prompt,
-          onProgress: (message) => activity.note(message)
-        });
-      } finally {
-        activity.stop();
-      }
-      process.stdout.write(`${result.answer}\n\n`);
-    }
-  } finally {
-    terminal.close();
-  }
-}
-
-function startActivity(stream = process.stdout) {
-  let timer;
-  let frame = 0;
-  let active = true;
-  const frames = ["·", "··", "···"];
-  const clear = () => {
-    if (stream.isTTY) stream.write("\r\u001b[2K");
-  };
-  const draw = () => {
-    if (stream.isTTY && active) stream.write(`\r${frames[frame++ % frames.length]} Working`);
-  };
-
-  if (stream.isTTY) {
-    draw();
-    timer = setInterval(draw, 280);
-    timer.unref?.();
-  }
-
-  return {
-    note(message) {
-      clear();
-      stream.write(`· ${message}\n`);
-      draw();
-    },
-    stop() {
-      active = false;
-      if (timer) clearInterval(timer);
-      clear();
-    }
-  };
-}
-
 function install(options) {
   const pluginRoot = resolve(ROOT, "plugins/fable-ous");
   if (!commandExists("codex")) throw new Error("Codex CLI is not installed.");
+  let styleWasActive = true;
+  let nativePreferencesWereActive = true;
+  try {
+    styleWasActive = isCodexStyleLayerActive();
+    nativePreferencesWereActive = isNativeCodexPreferencesActive();
+  } catch {
+    // Preserve unknown pre-existing state if the user's files cannot be inspected safely.
+  }
 
   run("codex", ["plugin", "marketplace", "add", ROOT]);
   run("codex", ["plugin", "add", "fable-ous@fable-ous"]);
-  const style = ensureCodexStyleLayer();
 
   if (!options["codex-only"] && commandExists("claude")) {
     run("claude", ["plugin", "validate", pluginRoot]);
@@ -191,28 +80,60 @@ function install(options) {
     const installed = execFileSync("claude", ["plugin", "list", "--json"], { encoding: "utf8" });
     run("claude", claudeInstallPlan(installed));
   }
+
+  let style;
+  let nativePreferences;
+  try {
+    style = ensureCodexStyleLayer();
+    nativePreferences = ensureNativeCodexPreferences();
+  } catch (error) {
+    if (!nativePreferencesWereActive) removeNativeCodexPreferences();
+    if (!styleWasActive) removeCodexStyleLayer();
+    throw error;
+  }
+
   process.stdout.write(
-    `Fable-ous installed. Codex style source: ${style.source}. Focus Mode is the default: run fable-ous in a fresh terminal.\n`
+    `Fable-ous installed in native Codex. Style source: ${style.source}; native calm settings: ${nativePreferences.active ? "active" : "inactive"}. Start a fresh session with codex.\n`
   );
 }
 
 function styleOff() {
-  const result = removeCodexStyleLayer();
-  process.stdout.write(result.removed
-    ? "Fable-ous removed its managed Codex instruction block.\n"
-    : "Fable-ous Codex style marker removed; existing user instructions were preserved.\n");
+  const style = removeCodexStyleLayer();
+  const nativePreferences = removeNativeCodexPreferences();
+  process.stdout.write(nativePreferences.markerPreserved
+    ? "Fable-ous preserved an unreadable rollback marker; no unsafe preference restore was attempted.\n"
+    : style.removed || nativePreferences.restored
+    ? "Fable-ous restored its managed Codex communication settings.\n"
+    : "Fable-ous markers were removed; existing user settings were preserved.\n");
 }
 
 function doctor() {
   const result = {
     codex: { available: commandExists("codex"), installed: false },
     claude: { available: commandExists("claude"), installed: false },
-    config: { modelVerbosity: "unset", personality: "unset" },
-    standardMode: {
-      durableStyle: isCodexStyleLayerActive(),
-      perTurnHooksSilent: handleHook({ mode: "prompt-submit" }) === null
+    config: {
+      modelVerbosity: "unset",
+      personality: "unset",
+      hideAgentReasoning: "unset"
+    },
+    nativeMode: {
+      durableStyle: false,
+      calmPreferences: false,
+      lifecycleHooks: false,
+      replacementClient: false
+    },
+    limits: {
+      nativeToolReceiptsRemainVisible: true,
+      externalHooksCanOverrideTheFinal: true
     }
   };
+
+  try {
+    result.nativeMode.durableStyle = isCodexStyleLayerActive();
+    result.nativeMode.calmPreferences = isNativeCodexPreferencesActive();
+  } catch {
+    result.nativeMode.error = "Could not safely inspect managed Codex communication files.";
+  }
 
   if (result.codex.available) {
     try {
@@ -234,9 +155,14 @@ function doctor() {
 
   const configPath = resolve(homedir(), ".codex/config.toml");
   if (existsSync(configPath)) {
-    const config = readFileSync(configPath, "utf8");
-    result.config.modelVerbosity = config.match(/^model_verbosity\s*=\s*"([^"]+)"/m)?.[1] || "unset";
-    result.config.personality = config.match(/^personality\s*=\s*"([^"]+)"/m)?.[1] || "unset";
+    try {
+      const values = nativeCodexPreferenceValues({ codexConfigPath: configPath });
+      result.config.modelVerbosity = values.model_verbosity;
+      result.config.personality = values.personality;
+      result.config.hideAgentReasoning = values.hide_agent_reasoning;
+    } catch {
+      result.config.error = "Could not safely read native Codex preferences.";
+    }
   }
 
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -252,24 +178,26 @@ async function lint() {
 }
 
 function help() {
-  process.stdout.write(`Fable-ous\n\nFocus Mode:\n  fable-ous [--cwd PATH] [--model MODEL] [--effort LEVEL]\n  fable-ous focus [--cwd PATH] [--model MODEL] [--effort LEVEL]\n\nCommands:\n  fable-ous install [--codex-only]\n  fable-ous style-off\n  fable-ous doctor\n  fable-ous strict [--cwd PATH] [--model MODEL] [--effort LEVEL]  (legacy alias)\n  fable-ous ask "PROMPT" [--cwd PATH] [--model MODEL]\n  fable-ous opus [--clean] [...CLAUDE_ARGS]\n  fable-ous fable [--clean] [...CLAUDE_ARGS]\n  fable-ous claude --model MODEL [--clean] [...CLAUDE_ARGS]\n  fable-ous lint < response.txt\n`);
+  process.stdout.write(`Fable-ous · native Codex plugin
+
+Install once, then run Codex normally:
+  fable-ous install [--codex-only]
+  codex
+
+Commands:
+  fable-ous install [--codex-only]
+  fable-ous doctor
+  fable-ous style-off
+  fable-ous lint < response.txt
+`);
 }
 
 export async function main(argv) {
-  if (argv[0] === "opus") return launchClaude(argv.slice(1), "claude-opus-5");
-  if (argv[0] === "fable") return launchClaude(argv.slice(1), "claude-fable-5");
-  if (argv[0] === "claude") return launchClaude(argv.slice(1));
   const { command, options } = parseArgs(argv);
   if (command === "install") return install(options);
   if (command === "style-off") return styleOff();
   if (command === "doctor") return doctor();
   if (command === "lint") return lint();
-  if (command === "ask") {
-    const prompt = options._.join(" ").trim();
-    if (!prompt) throw new Error("Provide a prompt after `fable-ous ask`.");
-    return askOnce(prompt, options);
-  }
-  if (command === "focus" || command === "strict") return interactive(options);
   if (command === "help" || command === "--help" || command === "-h") return help();
   throw new Error(`Unknown command: ${command}`);
 }
