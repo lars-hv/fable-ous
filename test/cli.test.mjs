@@ -1474,6 +1474,17 @@ test("Windows package verification bypasses the recursive npm.cmd shim and runs 
   assert.match(windowsJob, /npm run check:package/);
 });
 
+test("package verification executes through its public entrypoint", () => {
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("../scripts/check-package.mjs", import.meta.url))],
+    { cwd: SOURCE_ROOT, encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^Package content verified:/);
+});
+
 test("push CI checks the pushed commit instead of an empty main-to-main diff", () => {
   const workflow = readFileSync(new URL(".github/workflows/verify.yml", ROOT), "utf8");
   assert.match(workflow, /github\.event_name == 'pull_request'[\s\S]*git diff --check[\s\S]*github\.event\.pull_request\.base\.sha/);
