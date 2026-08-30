@@ -1,6 +1,7 @@
 import {
   chmodSync,
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   readFileSync,
@@ -76,6 +77,8 @@ function requireRegularFileOrAbsent(path) {
 
 function atomicWrite(path, content, mode = 0o600) {
   requireRegularFileOrAbsent(path);
+  activeOwnedTransaction?.assertCurrent(path);
+  const expected = activeOwnedTransaction?.expectedStates.get(path) || ownedPathState(path);
   let effectiveMode = mode;
   try {
     effectiveMode = lstatSync(path).mode & 0o7777;
@@ -87,19 +90,93 @@ function atomicWrite(path, content, mode = 0o600) {
   try {
     writeFileSync(temporary, content, { encoding: "utf8", mode: effectiveMode, flag: "wx" });
     chmodSync(temporary, effectiveMode);
-    const produced = ownedPathState(temporary);
-    activeOwnedTransaction?.assertCurrent(path);
-    renameSync(temporary, path);
-    activeOwnedTransaction?.record(path, produced);
+    replaceOwnedPath(path, temporary, expected);
+    activeOwnedTransaction?.record(path, ownedPathState(path));
   } finally {
     rmSync(temporary, { force: true });
   }
 }
 
+function uniqueDisplacedPath(path) {
+  return `${path}.fable-ous-displaced-${process.pid}-${Date.now()}-${randomBytes(8).toString("hex")}`;
+}
+
+function restoreDisplacedPath(path, displaced) {
+  try {
+    linkSync(displaced, path);
+    rmSync(displaced, { force: true });
+    return path;
+  } catch (error) {
+    if (error?.code === "EEXIST") return displaced;
+    throw error;
+  }
+}
+
+function replaceOwnedPath(path, preparedPath, expected) {
+  if (!expected.existed) {
+    try {
+      linkSync(preparedPath, path);
+      return;
+    } catch (error) {
+      if (error?.code === "EEXIST") {
+        throw new Error(`Concurrent change detected before creating managed path: ${path}`);
+      }
+      throw error;
+    }
+  }
+
+  const displaced = uniqueDisplacedPath(path);
+  try {
+    renameSync(path, displaced);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`Concurrent change detected before replacing managed path: ${path}`);
+    }
+    throw error;
+  }
+
+  const moved = ownedPathState(displaced);
+  if (!sameOwnedPathState(moved, expected)) {
+    const preservedAt = restoreDisplacedPath(path, displaced);
+    throw new Error(`Concurrent change detected before replacing managed path; bytes preserved at: ${preservedAt}`);
+  }
+
+  try {
+    linkSync(preparedPath, path);
+  } catch (error) {
+    rmSync(displaced, { force: true });
+    if (error?.code === "EEXIST") {
+      throw new Error(`Concurrent change detected while replacing managed path: ${path}`);
+    }
+    throw error;
+  }
+  rmSync(displaced, { force: true });
+}
+
 function removeOwnedPath(path, options = {}) {
   requireRegularFileOrAbsent(path);
   activeOwnedTransaction?.assertCurrent(path);
-  rmSync(path, options);
+  const expected = activeOwnedTransaction?.expectedStates.get(path) || ownedPathState(path);
+  if (!expected.existed) {
+    activeOwnedTransaction?.record(path, { path, existed: false });
+    return;
+  }
+
+  const displaced = uniqueDisplacedPath(path);
+  try {
+    renameSync(path, displaced);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`Concurrent change detected before removing managed path: ${path}`);
+    }
+    throw error;
+  }
+  const moved = ownedPathState(displaced);
+  if (!sameOwnedPathState(moved, expected)) {
+    const preservedAt = restoreDisplacedPath(path, displaced);
+    throw new Error(`Concurrent change detected before removing managed path; bytes preserved at: ${preservedAt}`);
+  }
+  rmSync(displaced, options);
   activeOwnedTransaction?.record(path, { path, existed: false });
 }
 
@@ -501,8 +578,32 @@ function styleOwnership(paths, content, managed, options = {}) {
 
 export function assertSafeCodexCommunicationPaths(options = {}, safety = {}) {
   const paths = resolvePaths(options);
+  const resolvedManagedPaths = [
+    paths.agentsPath,
+    paths.codexConfigPath,
+    paths.markerPath,
+    paths.nativeMarkerPath
+  ].map((path) => resolve(path));
+  if (new Set(resolvedManagedPaths).size !== resolvedManagedPaths.length) {
+    throw new Error("Fable-ous communication files must resolve to distinct managed paths.");
+  }
   for (const path of [paths.agentsPath, paths.codexConfigPath, paths.markerPath, paths.nativeMarkerPath]) {
     requireRegularFileOrAbsent(path);
+  }
+  const existingManagedFiles = [
+    paths.agentsPath,
+    paths.codexConfigPath,
+    paths.markerPath,
+    paths.nativeMarkerPath
+  ].filter((path) => existsSync(path)).map((path) => ({ path, stat: lstatSync(path) }));
+  for (let left = 0; left < existingManagedFiles.length; left++) {
+    for (let right = left + 1; right < existingManagedFiles.length; right++) {
+      const first = existingManagedFiles[left];
+      const second = existingManagedFiles[right];
+      if (first.stat.dev === second.stat.dev && first.stat.ino === second.stat.ino) {
+        throw new Error(`Fable-ous communication files must not share the same managed inode: ${first.path} and ${second.path}`);
+      }
+    }
   }
 
   const agentsContent = readOptionalText(paths.agentsPath);
@@ -621,7 +722,17 @@ export function removeNativeCodexPreferences(options = {}) {
   requireRegularFileOrAbsent(paths.nativeMarkerPath);
   const marker = readJson(paths.nativeMarkerPath);
   if (!validNativeMarker(marker)) {
-    return { restored: false, markerPreserved: existsSync(paths.nativeMarkerPath), ...paths };
+    const content = readOptionalCodexConfig(paths.codexConfigPath);
+    const incomplete = Object.entries(NATIVE_CODEX_PREFERENCES).some(([key, value]) => {
+      const setting = findTopLevelSetting(content, key);
+      return settingHasDesiredValue(setting, value);
+    });
+    return {
+      restored: false,
+      markerPreserved: existsSync(paths.nativeMarkerPath),
+      incomplete,
+      ...paths
+    };
   }
 
   let content = readOptionalCodexConfig(paths.codexConfigPath);
@@ -843,7 +954,7 @@ function restoreOwnedSnapshots(snapshots, producedStates, paths) {
         throw new Error(`Concurrent change preserved during rollback: ${snapshot.path}`);
       }
       if (!snapshot.existed) {
-        rmSync(snapshot.path, { force: true });
+        removeOwnedPath(snapshot.path, { force: true });
       } else {
         atomicWrite(snapshot.path, snapshot.content, snapshot.mode);
         chmodSync(snapshot.path, snapshot.mode);
@@ -900,7 +1011,7 @@ function runCodexCommunicationTransaction(
     } catch (rollbackError) {
       throw new AggregateError(
         [error, rollbackError],
-        rollbackMessage
+        `${rollbackMessage} Cause: ${error?.message || "managed filesystem transaction failed"}`
       );
     }
     throw error;
@@ -920,8 +1031,8 @@ export function ensureCodexCommunicationLayer(options = {}) {
 export function removeCodexCommunicationLayer(options = {}) {
   return runCodexCommunicationTransaction(options, () => {
     const nativePreferences = removeNativeCodexPreferences(options);
-    if (nativePreferences.markerPreserved) {
-      throw new Error("Fable-ous could not safely restore native preferences.");
+    if (nativePreferences.markerPreserved || nativePreferences.incomplete) {
+      throw new Error("Fable-ous could not safely restore native preferences because rollback evidence is missing or invalid.");
     }
     const style = removeCodexStyleLayer(options);
     return { style, nativePreferences };

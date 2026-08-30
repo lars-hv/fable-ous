@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -497,6 +497,79 @@ test("public install fails before host mutation for unsafe owner-controlled comm
   }
 });
 
+test("public install rejects colliding AGENTS and Codex config paths before host mutation", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-path-collision-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const invocationLog = join(root, "codex-invoked.log");
+  const configPath = join(codexHome, "config.toml");
+  mkdirSync(bin);
+  mkdirSync(codexHome, { recursive: true });
+  writeFileSync(join(bin, "codex"), `#!/bin/sh
+printf invoked >> '${invocationLog}'
+exit 0
+`);
+  chmodSync(join(bin, "codex"), 0o700);
+  const original = 'personality = "pragmatic"\n';
+  writeFileSync(configPath, original);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: bin,
+        CODEX_HOME: codexHome,
+        FABLE_OUS_AGENTS_PATH: configPath
+      }
+    }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /distinct|same managed path|path collision/i);
+  assert.equal(readFileSync(configPath, "utf8"), original);
+  assert.equal(existsSync(invocationLog), false, "Codex was invoked before the path preflight failed");
+  assert.equal(existsSync(join(codexHome, "fable-ous")), false);
+});
+
+test("public install rejects distinct managed paths sharing one inode before host mutation", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-inode-collision-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const invocationLog = join(root, "codex-invoked.log");
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const configPath = join(codexHome, "config.toml");
+  mkdirSync(bin);
+  mkdirSync(codexHome, { recursive: true });
+  writeFileSync(join(bin, "codex"), `#!/bin/sh
+printf invoked >> '${invocationLog}'
+exit 0
+`);
+  chmodSync(join(bin, "codex"), 0o700);
+  const original = Buffer.from("# Owner-controlled bytes\n");
+  writeFileSync(agentsPath, original);
+  linkSync(agentsPath, configPath);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    { encoding: "utf8", env: { ...process.env, PATH: bin, CODEX_HOME: codexHome } }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /same managed inode|share.*inode/i);
+  assert.deepEqual(readFileSync(agentsPath), original);
+  assert.deepEqual(readFileSync(configPath), original);
+  assert.equal(existsSync(invocationLog), false, "Codex was invoked before the inode preflight failed");
+  assert.equal(existsSync(join(codexHome, "fable-ous")), false);
+});
+
 test("public install and style-off reject a stale legacy marker beside a fenced user example", {
   skip: process.platform === "win32"
 }, () => {
@@ -573,6 +646,35 @@ test("style-off fails before changing any communication file when rollback evide
   assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stderr, /invalid rollback marker|cannot safely/i);
   assert.deepEqual(paths.map((path) => readFileSync(path, "utf8")), before);
+});
+
+test("public style-off fails closed when native preference rollback evidence is missing", () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-missing-native-marker-"));
+  const codexHome = join(root, "codex-home");
+  const env = { CODEX_HOME: codexHome };
+  ensureNativeCodexPreferences({ env });
+  ensureCodexStyleLayer({ env });
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const configPath = join(codexHome, "config.toml");
+  const styleMarkerPath = join(codexHome, "fable-ous", "standard.json");
+  const nativeMarkerPath = join(codexHome, "fable-ous", "native-preferences.json");
+  rmSync(nativeMarkerPath);
+  const before = [agentsPath, configPath, styleMarkerPath].map((path) => readFileSync(path));
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+    { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /rollback evidence|native preferences|cannot safely restore/i);
+  assert.doesNotMatch(result.stdout, /restored its managed Codex communication settings/i);
+  assert.deepEqual(
+    [agentsPath, configPath, styleMarkerPath].map((path) => readFileSync(path)),
+    before
+  );
+  assert.equal(existsSync(nativeMarkerPath), false);
 });
 
 test("public style-off restores a legacy AGENTS file byte-for-byte and keeps its rollback backup", () => {
@@ -949,6 +1051,116 @@ exit 0
   assert.equal(readFileSync(configPath, "utf8"), original);
   assert.equal(existsSync(join(codexHome, "fable-ous", "native-preferences.json")), false);
   assert.equal(existsSync(hostMutationLog), false, "predictable config failure must precede host plugin mutation");
+});
+
+test("public install preserves a concurrent config edit made immediately before replacement", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-rename-race-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const configPath = join(codexHome, "config.toml");
+  const preloadPath = join(root, "rename-race.cjs");
+  mkdirSync(bin);
+  mkdirSync(codexHome, { recursive: true });
+  const { entry } = installCodexArtifact(codexHome);
+  writeCodexInstallCommand(join(bin, "codex"), { installed: [entry] });
+  writeFileSync(configPath, 'personality = "pragmatic"\n');
+  const concurrent = 'personality = "none"\nowner_edit = true\n';
+  writeFileSync(preloadPath, `
+const fs = require("node:fs");
+const { syncBuiltinESMExports } = require("node:module");
+const originalRenameSync = fs.renameSync;
+let injected = false;
+fs.renameSync = function(source, destination) {
+  if (!injected && source === ${JSON.stringify(configPath)}) {
+    injected = true;
+    fs.writeFileSync(${JSON.stringify(configPath)}, ${JSON.stringify(concurrent)});
+  }
+  return originalRenameSync(source, destination);
+};
+syncBuiltinESMExports();
+`);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: bin,
+        CODEX_HOME: codexHome,
+        NODE_OPTIONS: `--require=${preloadPath}`
+      }
+    }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /concurrent change|changed before/i);
+  assert.equal(readFileSync(configPath, "utf8"), concurrent);
+  assert.equal(existsSync(join(codexHome, "fable-ous", "native-preferences.json")), false);
+});
+
+test("public style-off preserves a concurrent marker replacement made immediately before removal", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-remove-race-"));
+  const codexHome = join(root, "codex-home");
+  const env = { CODEX_HOME: codexHome };
+  ensureNativeCodexPreferences({ env });
+  ensureCodexStyleLayer({ env });
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const configPath = join(codexHome, "config.toml");
+  const styleMarkerPath = join(codexHome, "fable-ous", "standard.json");
+  const nativeMarkerPath = join(codexHome, "fable-ous", "native-preferences.json");
+  const preloadPath = join(root, "remove-race.cjs");
+  const concurrent = "owner replacement marker bytes\n";
+  const before = [agentsPath, configPath, styleMarkerPath].map((path) => readFileSync(path));
+  writeFileSync(preloadPath, `
+const fs = require("node:fs");
+const { syncBuiltinESMExports } = require("node:module");
+const originalRenameSync = fs.renameSync;
+const originalRmSync = fs.rmSync;
+let injected = false;
+function inject(target) {
+  if (!injected && target === ${JSON.stringify(nativeMarkerPath)}) {
+    injected = true;
+    fs.writeFileSync(${JSON.stringify(nativeMarkerPath)}, ${JSON.stringify(concurrent)});
+  }
+}
+fs.renameSync = function(source, destination) {
+  inject(source);
+  return originalRenameSync(source, destination);
+};
+fs.rmSync = function(target, options) {
+  inject(target);
+  return originalRmSync(target, options);
+};
+syncBuiltinESMExports();
+`);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CODEX_HOME: codexHome,
+        NODE_OPTIONS: `--require=${preloadPath}`
+      }
+    }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /concurrent change|changed before/i);
+  assert.equal(readFileSync(nativeMarkerPath, "utf8"), concurrent);
+  assert.deepEqual(
+    [agentsPath, configPath, styleMarkerPath].map((path) => readFileSync(path)),
+    before
+  );
+  assert.doesNotMatch(result.stdout, /restored its managed Codex communication settings/i);
 });
 
 test("a late filesystem race still rolls back newly applied native preferences", {
