@@ -1,5 +1,7 @@
 import {
   chmodSync,
+  constants,
+  copyFileSync,
   existsSync,
   linkSync,
   lstatSync,
@@ -113,10 +115,20 @@ function atomicWrite(path, content, mode = 0o600) {
   try {
     writeFileSync(temporary, content, { encoding: "utf8", mode: effectiveMode, flag: "wx" });
     chmodSync(temporary, effectiveMode);
+    const produced = ownedPathState(temporary);
     replaceOwnedPath(path, temporary, expected);
-    activeOwnedTransaction?.record(path, ownedPathState(path));
+    activeOwnedTransaction?.record(path, produced);
   } finally {
     rmSync(temporary, { force: true });
+  }
+}
+
+function assertHardLinkSupport(path) {
+  const probe = uniqueDisplacedPath(`${path}.link-probe`);
+  try {
+    linkSync(path, probe);
+  } finally {
+    rmSync(probe, { force: true });
   }
 }
 
@@ -131,7 +143,16 @@ function restoreDisplacedPath(path, displaced) {
     return path;
   } catch (error) {
     if (error?.code === "EEXIST") return displaced;
-    throw error;
+    try {
+      const originalMode = lstatSync(displaced).mode & 0o7777;
+      copyFileSync(displaced, path, constants.COPYFILE_EXCL);
+      chmodSync(path, originalMode);
+      chmodSync(displaced, 0o600);
+      return displaced;
+    } catch (copyError) {
+      if (copyError?.code === "EEXIST") return displaced;
+      throw new AggregateError([error, copyError], `Could not restore displaced managed path: ${path}`);
+    }
   }
 }
 
@@ -164,6 +185,7 @@ function replaceOwnedPath(path, preparedPath, expected) {
   }
 
   const displaced = uniqueDisplacedPath(path);
+  assertHardLinkSupport(path);
   try {
     renameSync(path, displaced);
   } catch (error) {
@@ -205,6 +227,7 @@ function removeOwnedPath(path, options = {}) {
   }
 
   const displaced = uniqueDisplacedPath(path);
+  assertHardLinkSupport(path);
   try {
     renameSync(path, displaced);
   } catch (error) {
@@ -626,6 +649,9 @@ function markdownPositionIsInsideFence(content, position) {
 function styleOwnership(paths, content, managed, options = {}) {
   const marker = readStyleMarker(paths);
   if (!marker) return { owned: false, marker: null };
+  if (!options.allowLegacyMarker && marker.schema < 3) {
+    throw new Error("Cannot safely remove an unbound legacy style marker; run install once to migrate it first.");
+  }
   if (!managed) {
     if (!options.allowOrphanMarker) {
       throw new Error("Cannot safely update a style marker that is not bound to AGENTS.md content.");
@@ -681,7 +707,8 @@ export function assertSafeCodexCommunicationPaths(options = {}, safety = {}) {
   const agentsContent = readOptionalText(paths.agentsPath);
   const managed = managedBlockBounds(agentsContent);
   const ownership = styleOwnership(paths, agentsContent, managed, {
-    allowOrphanMarker: safety.allowOrphanStyleMarker
+    allowOrphanMarker: safety.allowOrphanStyleMarker,
+    allowLegacyMarker: safety.allowLegacyStyleMarker
   });
   if (!managed
     && !safety.allowOpenFenceWithoutManaged
@@ -695,7 +722,11 @@ export function assertSafeCodexCommunicationPaths(options = {}, safety = {}) {
   const configContent = readOptionalCodexConfig(paths.codexConfigPath);
   const markerExists = existsSync(paths.nativeMarkerPath);
   const marker = markerExists ? readJson(paths.nativeMarkerPath) : null;
-  if (markerExists && (!validNativeMarker(marker) || !nativeMarkerOwnsTarget(marker, paths))) {
+  if (markerExists && (
+    !validNativeMarker(marker)
+    || !nativeMarkerOwnsTarget(marker, paths)
+    || (marker.schema === 1 && !safety.allowLegacyNativeMarker)
+  )) {
     throw new Error(`Cannot safely update invalid rollback marker: ${paths.nativeMarkerPath}`);
   }
   const keys = new Set([
@@ -729,8 +760,14 @@ export function ensureNativeCodexPreferences(options = {}) {
   content = assertBomFreeCodexConfig(content, paths.codexConfigPath);
   const markerExists = existsSync(paths.nativeMarkerPath);
   const existingMarker = readJson(paths.nativeMarkerPath);
-  const validOriginal = validNativeMarker(existingMarker)
-    && nativeMarkerOwnsTarget(existingMarker, paths);
+  const validMarker = validNativeMarker(existingMarker);
+  if (markerExists && !validMarker) {
+    throw new Error(`Cannot safely update invalid rollback marker: ${paths.nativeMarkerPath}`);
+  }
+  if (existingMarker?.schema === 1 && options.allowLegacyMigration !== true) {
+    throw new Error("Cannot safely migrate an unbound legacy native-preferences marker without explicit --migrate-legacy authorization.");
+  }
+  const validOriginal = validMarker && nativeMarkerOwnsTarget(existingMarker, paths);
   if (markerExists && !validOriginal) {
     throw new Error(`Cannot safely update invalid rollback marker: ${paths.nativeMarkerPath}`);
   }
@@ -777,7 +814,7 @@ export function isNativeCodexPreferencesActive(options = {}) {
   requireRegularFileOrAbsent(paths.nativeMarkerPath);
   if (!existsSync(paths.nativeMarkerPath)) return false;
   const marker = readJson(paths.nativeMarkerPath);
-  if (!validNativeMarker(marker) || !nativeMarkerOwnsTarget(marker, paths)) return false;
+  if (!validNativeMarker(marker) || marker.schema !== 2 || !nativeMarkerOwnsTarget(marker, paths)) return false;
   const content = readOptionalCodexConfig(paths.codexConfigPath);
   return Object.entries(NATIVE_CODEX_PREFERENCES).every(([key, value]) => {
     const setting = findTopLevelSetting(content, key);
@@ -794,12 +831,14 @@ export function nativeCodexPreferenceValues(options = {}) {
   }));
 }
 
-export function removeNativeCodexPreferences(options = {}) {
+export function removeNativeCodexPreferences(options = {}, safety = {}) {
   const paths = resolvePaths(options);
   requireRegularFileOrAbsent(paths.codexConfigPath);
   requireRegularFileOrAbsent(paths.nativeMarkerPath);
   const marker = readJson(paths.nativeMarkerPath);
-  if (!validNativeMarker(marker) || !nativeMarkerOwnsTarget(marker, paths)) {
+  if (!validNativeMarker(marker)
+    || !nativeMarkerOwnsTarget(marker, paths)
+    || (marker.schema === 1 && !safety.allowLegacyMarker)) {
     const content = readOptionalCodexConfig(paths.codexConfigPath);
     const incomplete = Object.entries(NATIVE_CODEX_PREFERENCES).some(([key, value]) => {
       const setting = findTopLevelSetting(content, key);
@@ -910,7 +949,9 @@ export function ensureCodexStyleLayer(options = {}) {
   const content = options.existingContent ?? readOptionalText(paths.agentsPath);
 
   const managed = managedBlockBounds(content);
-  const ownership = styleOwnership(paths, content, managed);
+  const ownership = styleOwnership(paths, content, managed, {
+    allowLegacyMarker: options.allowLegacyMigration === true
+  });
   if (managed && !ownership.owned) {
     throw new Error("Cannot safely update an unowned Fable-ous marker example in AGENTS.md.");
   }
@@ -956,7 +997,7 @@ export function isCodexStyleLayerActive(options = {}) {
   requireRegularFileOrAbsent(paths.markerPath);
   const content = readOptionalText(paths.agentsPath);
   const managed = managedBlockBounds(content);
-  const ownership = styleOwnership(paths, content, managed);
+  const ownership = styleOwnership(paths, content, managed, { allowLegacyMarker: true });
   return Boolean(managed)
     && ownership.owned
     && !ownership.legacy
@@ -1081,12 +1122,21 @@ function runCodexCommunicationTransaction(
         this.producedStates.set(path, produced);
         this.expectedStates.set(path, produced);
       }
+    },
+    assertAllCurrent() {
+      for (const [path, expected] of this.expectedStates) {
+        if (!sameOwnedPathState(ownedPathState(path), expected)) {
+          throw new Error(`Concurrent change detected before completing managed transaction: ${path}`);
+        }
+      }
     }
   };
 
   try {
     activeOwnedTransaction = transaction;
-    return operation();
+    const result = operation();
+    transaction.assertAllCurrent();
+    return result;
   } catch (error) {
     activeOwnedTransaction = null;
     try {
@@ -1104,11 +1154,15 @@ function runCodexCommunicationTransaction(
 }
 
 export function ensureCodexCommunicationLayer(options = {}) {
+  const allowLegacyMigration = options.allowLegacyMigration === true;
   return runCodexCommunicationTransaction(options, () => {
     const nativePreferences = ensureNativeCodexPreferences(options);
     const style = ensureCodexStyleLayer(options);
     return { style, nativePreferences };
-  }, "Fable-ous install failed and its owned-file rollback was incomplete.");
+  }, "Fable-ous install failed and its owned-file rollback was incomplete.", {
+    allowLegacyNativeMarker: allowLegacyMigration,
+    allowLegacyStyleMarker: allowLegacyMigration
+  });
 }
 
 export function removeCodexCommunicationLayer(options = {}) {
@@ -1120,7 +1174,6 @@ export function removeCodexCommunicationLayer(options = {}) {
     const style = removeCodexStyleLayer(options);
     return { style, nativePreferences };
   }, "Fable-ous style-off failed and its owned-file rollback was incomplete.", {
-    allowUnownedStyleMarkers: true,
     allowOrphanStyleMarker: true,
     allowOpenFenceWithoutManaged: true
   });

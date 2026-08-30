@@ -334,7 +334,7 @@ test("reinstall migrates a provable legacy block after no-final-newline owner co
   );
 
   assert.equal(isCodexStyleLayerActive(paths), false);
-  assert.equal(ensureCodexStyleLayer(paths).changed, true);
+  assert.equal(ensureCodexStyleLayer({ ...paths, allowLegacyMigration: true }).changed, true);
   assert.match(
     readFileSync(paths.agentsPath, "utf8"),
     new RegExp(`\\n<!-- fable-ous:codex-style:boundary:[0-9a-f]{32} -->\\n${MANAGED_BLOCK_START}`),
@@ -350,7 +350,7 @@ test("a schema-1 boundary without its byte-exact backup is not migration proof",
   writeStyleMarker(paths);
 
   assert.throws(
-    () => ensureCodexStyleLayer({ ...paths, existingContent: old }),
+    () => ensureCodexStyleLayer({ ...paths, existingContent: old, allowLegacyMigration: true }),
     /byte-exact AGENTS\.md backup/i
   );
   assert.equal(existsSync(paths.agentsPath), false);
@@ -488,7 +488,7 @@ test("upgrade preserves a provably related legacy AGENTS.md backup for exact rol
   writeFileSync(`${paths.agentsPath}.fable-ous.bak`, original);
   writeStyleMarker(paths);
 
-  ensureCodexStyleLayer(paths);
+  ensureCodexStyleLayer({ ...paths, allowLegacyMigration: true });
 
   assert.equal(readFileSync(`${paths.agentsPath}.fable-ous.bak`, "utf8"), original);
   assert.match(readFileSync(paths.agentsPath, "utf8"), /synthetic-secret-marker-123/);
@@ -502,7 +502,7 @@ test("upgrade fails closed when an old block has only an unrelated legacy backup
   writeStyleMarker(paths);
 
   assert.throws(
-    () => ensureCodexStyleLayer(paths),
+    () => ensureCodexStyleLayer({ ...paths, allowLegacyMigration: true }),
     /unbound legacy|cannot safely/i
   );
 
@@ -714,7 +714,7 @@ test("upgrade restores the verbosity value managed by an older release", () => {
     }
   })}\n`);
 
-  ensureNativeCodexPreferences(paths);
+  ensureNativeCodexPreferences({ ...paths, allowLegacyMigration: true });
   assert.match(readFileSync(paths.codexConfigPath, "utf8"), /^model_verbosity = "medium"$/m);
   assert.equal(removeNativeCodexPreferences(paths).restored, true);
   assert.equal(readFileSync(paths.codexConfigPath, "utf8"), original);
@@ -733,7 +733,7 @@ test("upgrade preserves a verbosity value the user changed after install", () =>
     }
   })}\n`);
 
-  ensureNativeCodexPreferences(paths);
+  ensureNativeCodexPreferences({ ...paths, allowLegacyMigration: true });
   assert.match(readFileSync(paths.codexConfigPath, "utf8"), /^model_verbosity = "high"$/m);
   removeNativeCodexPreferences(paths);
   assert.match(readFileSync(paths.codexConfigPath, "utf8"), /^model_verbosity = "high"$/m);

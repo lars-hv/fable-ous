@@ -104,13 +104,7 @@ function writeNativeDoctorState(codexHome) {
   mkdirSync(join(codexHome, "fable-ous"), { recursive: true });
   writeFileSync(join(codexHome, "config.toml"), 'personality = "friendly"\nhide_agent_reasoning = true\n');
   ensureCodexStyleLayer({ env: { CODEX_HOME: codexHome } });
-  writeFileSync(join(codexHome, "fable-ous", "native-preferences.json"), `${JSON.stringify({
-    schema: 1,
-    original: {
-      personality: { present: false },
-      hide_agent_reasoning: { present: false }
-    }
-  })}\n`);
+  ensureNativeCodexPreferences({ env: { CODEX_HOME: codexHome } });
 }
 
 function writePluginListCommand(path, payload) {
@@ -131,7 +125,7 @@ exit 0
   chmodSync(path, 0o700);
 }
 
-function runRejectedCodexInstallPreflight({ agentsContent, configContent, styleMarkerContent }) {
+function runRejectedCodexInstallPreflight({ agentsContent, configContent, styleMarkerContent, nativeMarkerContent }) {
   const root = mkdtempSync(join(tmpdir(), "fable-ous-install-owner-preflight-"));
   const bin = join(root, "bin");
   const codexHome = join(root, "codex-home");
@@ -151,10 +145,15 @@ exit 0
     mkdirSync(join(codexHome, "fable-ous"), { recursive: true });
     writeFileSync(join(codexHome, "fable-ous", "standard.json"), styleMarkerContent);
   }
+  if (nativeMarkerContent !== undefined) {
+    mkdirSync(join(codexHome, "fable-ous"), { recursive: true });
+    writeFileSync(join(codexHome, "fable-ous", "native-preferences.json"), nativeMarkerContent);
+  }
   const watched = [
     agentsPath,
     configPath,
-    join(codexHome, "fable-ous", "standard.json")
+    join(codexHome, "fable-ous", "standard.json"),
+    join(codexHome, "fable-ous", "native-preferences.json")
   ].filter((path) => existsSync(path));
   const before = watched.map((path) => readFileSync(path));
 
@@ -755,7 +754,80 @@ test("public style-off rejects rollback markers from another target", () => {
   assert.doesNotMatch(result.stdout, /restored its managed Codex communication settings/i);
 });
 
-test("public style-off restores a legacy AGENTS file byte-for-byte and keeps its rollback backup", () => {
+test("public style-off rejects a schema-1 native marker copied from another Codex home", () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-legacy-target-"));
+  const codexHome = join(root, "home-b");
+  const configDir = join(codexHome, "fable-ous");
+  const configPath = join(codexHome, "config.toml");
+  mkdirSync(configDir, { recursive: true });
+  const ownerConfig = 'personality = "friendly"\nhide_agent_reasoning = true\nowner_home = "b"\n';
+  writeFileSync(configPath, ownerConfig);
+  writeFileSync(join(configDir, "native-preferences.json"), `${JSON.stringify({
+    schema: 1,
+    original: {
+      personality: { present: true, line: 'personality = "none"' },
+      hide_agent_reasoning: { present: false }
+    }
+  })}\n`);
+  const markerBefore = readFileSync(join(configDir, "native-preferences.json"));
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+    { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /legacy|target|binding|rollback evidence|cannot safely/i);
+  assert.equal(readFileSync(configPath, "utf8"), ownerConfig);
+  assert.deepEqual(readFileSync(join(configDir, "native-preferences.json")), markerBefore);
+  assert.doesNotMatch(result.stdout, /restored its managed Codex communication settings/i);
+});
+
+test("public install rejects an unbound schema-1 native marker before host mutation", () => {
+  const marker = `${JSON.stringify({
+    schema: 1,
+    original: {
+      personality: { present: true, line: 'personality = "none"' },
+      hide_agent_reasoning: { present: false }
+    }
+  })}\n`;
+  const install = runRejectedCodexInstallPreflight({
+    configContent: 'personality = "friendly"\nhide_agent_reasoning = true\nowner_home = "b"\n',
+    nativeMarkerContent: marker
+  });
+
+  assert.notEqual(install.result.status, 0, `${install.result.stdout}\n${install.result.stderr}`);
+  assert.match(install.result.stderr, /legacy|unbound|migrate|cannot safely/i);
+  assert.deepEqual(install.watched.map((path) => readFileSync(path)), install.before);
+  assert.equal(existsSync(install.invocationLog), false, "Codex was invoked before legacy ownership failed");
+});
+
+test("public style-off fails closed when the style ownership marker is missing", () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-missing-style-marker-"));
+  const codexHome = join(root, "codex-home");
+  const env = { CODEX_HOME: codexHome };
+  ensureNativeCodexPreferences({ env });
+  ensureCodexStyleLayer({ env });
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const configPath = join(codexHome, "config.toml");
+  const nativeMarkerPath = join(codexHome, "fable-ous", "native-preferences.json");
+  rmSync(join(codexHome, "fable-ous", "standard.json"));
+  const before = [agentsPath, configPath, nativeMarkerPath].map((path) => readFileSync(path));
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+    { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /style marker|ownership|bound|cannot safely/i);
+  assert.deepEqual([agentsPath, configPath, nativeMarkerPath].map((path) => readFileSync(path)), before);
+  assert.doesNotMatch(result.stdout, /restored its managed Codex communication settings/i);
+});
+
+test("public style-off refuses an unbound legacy AGENTS marker until install migrates it", () => {
   const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-legacy-bytes-"));
   const codexHome = join(root, "codex-home");
   const configDir = join(codexHome, "fable-ous");
@@ -769,6 +841,8 @@ test("public style-off restores a legacy AGENTS file byte-for-byte and keeps its
   ]));
   writeFileSync(backupPath, original);
   writeFileSync(join(configDir, "standard.json"), '{"schema":1,"source":"managed"}\n');
+  const before = [agentsPath, backupPath, join(configDir, "standard.json")]
+    .map((path) => readFileSync(path));
 
   const result = spawnSync(
     process.execPath,
@@ -776,9 +850,12 @@ test("public style-off restores a legacy AGENTS file byte-for-byte and keeps its
     { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
   );
 
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.deepEqual(readFileSync(agentsPath), original);
-  assert.deepEqual(readFileSync(backupPath), original);
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /legacy|install once|migrate|cannot safely/i);
+  assert.deepEqual(
+    [agentsPath, backupPath, join(configDir, "standard.json")].map((path) => readFileSync(path)),
+    before
+  );
 });
 
 test("public install preserves a proven legacy AGENTS rollback backup", {
@@ -801,7 +878,7 @@ test("public install preserves a proven legacy AGENTS rollback backup", {
 
   const result = spawnSync(
     process.execPath,
-    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only", "--migrate-legacy"],
     { encoding: "utf8", env: { ...process.env, PATH: bin, CODEX_HOME: codexHome } }
   );
 
@@ -809,7 +886,7 @@ test("public install preserves a proven legacy AGENTS rollback backup", {
   assert.deepEqual(readFileSync(backupPath), Buffer.from(original));
 });
 
-test("public style-off never treats a fenced user marker example as owned", () => {
+test("public style-off refuses a fenced user marker example without ownership evidence", () => {
   const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-unowned-example-"));
   const codexHome = join(root, "codex-home");
   const agentsPath = join(codexHome, "AGENTS.md");
@@ -823,7 +900,8 @@ test("public style-off never treats a fenced user marker example as owned", () =
     { encoding: "utf8", env: { ...process.env, CODEX_HOME: codexHome } }
   );
 
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /unowned|marker|ownership|cannot safely/i);
   assert.equal(readFileSync(agentsPath, "utf8"), original);
 });
 
@@ -1301,6 +1379,163 @@ syncBuiltinESMExports();
     true,
     "recovery links containing owner bytes must be private"
   );
+});
+
+test("failed install keeps a post-link owner config edit at the canonical path", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-post-link-rollback-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const agentsDir = join(root, "locked-agents");
+  const agentsPath = join(agentsDir, "AGENTS.md");
+  const configPath = join(codexHome, "config.toml");
+  const preloadPath = join(root, "post-link-owner-edit.cjs");
+  const ownerConfig = 'personality = "none"\nhide_agent_reasoning = false\nowner_post_link = true\n';
+  mkdirSync(bin);
+  mkdirSync(agentsDir);
+  const { entry } = installCodexArtifact(codexHome);
+  writeCodexInstallCommand(join(bin, "codex"), { installed: [entry] });
+  writeFileSync(configPath, 'personality = "pragmatic"\n');
+  writeFileSync(preloadPath, `
+const fs = require("node:fs");
+const { syncBuiltinESMExports } = require("node:module");
+const originalLinkSync = fs.linkSync;
+let injected = false;
+fs.linkSync = function(source, destination) {
+  const result = originalLinkSync(source, destination);
+  if (!injected && destination === ${JSON.stringify(configPath)}) {
+    injected = true;
+    fs.writeFileSync(${JSON.stringify(configPath)}, ${JSON.stringify(ownerConfig)});
+  }
+  return result;
+};
+syncBuiltinESMExports();
+`);
+  chmodSync(agentsDir, 0o500);
+  let result;
+  try {
+    result = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: bin,
+          CODEX_HOME: codexHome,
+          FABLE_OUS_AGENTS_PATH: agentsPath,
+          NODE_OPTIONS: `--require=${preloadPath}`
+        }
+      }
+    );
+  } finally {
+    chmodSync(agentsDir, 0o700);
+  }
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(readFileSync(configPath, "utf8"), ownerConfig);
+});
+
+test("public install preserves canonical owner files when hard links are unsupported", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-no-hardlinks-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const configPath = join(codexHome, "config.toml");
+  const agentsPath = join(codexHome, "AGENTS.md");
+  const preloadPath = join(root, "no-hardlinks.cjs");
+  const originalConfig = 'personality = "pragmatic"\n';
+  const originalAgents = "# Owner rules\n";
+  mkdirSync(bin);
+  const { entry } = installCodexArtifact(codexHome);
+  writeCodexInstallCommand(join(bin, "codex"), { installed: [entry] });
+  writeFileSync(configPath, originalConfig);
+  writeFileSync(agentsPath, originalAgents);
+  writeFileSync(preloadPath, `
+const fs = require("node:fs");
+const { syncBuiltinESMExports } = require("node:module");
+const originalLinkSync = fs.linkSync;
+fs.linkSync = function(source, destination) {
+  if (source === ${JSON.stringify(configPath)} || destination === ${JSON.stringify(configPath)}) {
+    const error = new Error("hard links unsupported for managed config");
+    error.code = "ENOTSUP";
+    throw error;
+  }
+  return originalLinkSync(source, destination);
+};
+syncBuiltinESMExports();
+`);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: bin,
+        CODEX_HOME: codexHome,
+        NODE_OPTIONS: `--require=${preloadPath}`
+      }
+    }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(readFileSync(configPath, "utf8"), originalConfig);
+  assert.equal(readFileSync(agentsPath, "utf8"), originalAgents);
+});
+
+test("public install restores the canonical owner file when hard links fail after displacement", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-post-displacement-link-failure-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const configPath = join(codexHome, "config.toml");
+  const preloadPath = join(root, "post-displacement-link-failure.cjs");
+  const originalConfig = 'personality = "pragmatic"\nowner_value = 7\n';
+  mkdirSync(bin);
+  const { entry } = installCodexArtifact(codexHome);
+  writeCodexInstallCommand(join(bin, "codex"), { installed: [entry] });
+  writeFileSync(configPath, originalConfig);
+  writeFileSync(preloadPath, `
+const fs = require("node:fs");
+const { syncBuiltinESMExports } = require("node:module");
+const originalLinkSync = fs.linkSync;
+fs.linkSync = function(source, destination) {
+  const touchesCanonical = destination === ${JSON.stringify(configPath)};
+  if (touchesCanonical && !String(destination).includes(".link-probe")) {
+    const error = new Error("one-shot hard-link failure after displacement");
+    error.code = "ENOTSUP";
+    throw error;
+  }
+  return originalLinkSync(source, destination);
+};
+syncBuiltinESMExports();
+`);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: bin,
+        CODEX_HOME: codexHome,
+        NODE_OPTIONS: `--require=${preloadPath}`
+      }
+    }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(readFileSync(configPath, "utf8"), originalConfig);
+  const recoveries = readdirSync(codexHome)
+    .filter((name) => name.startsWith("config.toml.fable-ous-displaced-"));
+  assert.ok(recoveries.length >= 1, "late open-descriptor bytes retain a private recovery path");
+  assert.equal(readFileSync(join(codexHome, recoveries.at(-1)), "utf8"), originalConfig);
 });
 
 test("a late filesystem race still rolls back newly applied native preferences", {
@@ -1807,8 +2042,8 @@ test("the CLI source does not expose model or client launchers", () => {
 test("host plugin installation completes before global Codex communication files are changed", () => {
   const source = readFileSync(new URL("src/cli.mjs", ROOT), "utf8");
   const installBody = source.slice(source.indexOf("function install(options)"), source.indexOf("function styleOff()"));
-  assert.ok(installBody.indexOf('run("claude", claudeInstallPlan(installed))') < installBody.indexOf("ensureCodexCommunicationLayer()"));
-  assert.match(installBody, /ensureCodexCommunicationLayer\(\)/);
+  assert.ok(installBody.indexOf('run("claude", claudeInstallPlan(installed))') < installBody.indexOf("ensureCodexCommunicationLayer({ allowLegacyMigration })"));
+  assert.match(installBody, /ensureCodexCommunicationLayer\(\{ allowLegacyMigration \}\)/);
   assert.doesNotMatch(installBody, /ensureNativeCodexPreferences\(\)|ensureCodexStyleLayer\(\)/);
 });
 

@@ -332,7 +332,11 @@ export function claudeEnablePlan(pluginListJson = "[]") {
 }
 
 function install(options) {
-  assertSafeCodexCommunicationPaths();
+  const allowLegacyMigration = options["migrate-legacy"] === true;
+  assertSafeCodexCommunicationPaths({}, {
+    allowLegacyNativeMarker: allowLegacyMigration,
+    allowLegacyStyleMarker: allowLegacyMigration
+  });
   if (!commandExists("codex")) throw new Error("Codex CLI is not installed.");
   const codexHome = process.env.CODEX_HOME
     ? resolve(process.env.CODEX_HOME)
@@ -370,7 +374,7 @@ function install(options) {
     }
   }
 
-  const { style, nativePreferences } = ensureCodexCommunicationLayer();
+  const { style, nativePreferences } = ensureCodexCommunicationLayer({ allowLegacyMigration });
 
   process.stdout.write(
     `Fable-ous installed in native Codex. Style source: ${style.source}; native calm settings: ${nativePreferences.active ? "active" : "inactive"}. Start a fresh session with codex.\n`
@@ -475,11 +479,11 @@ function help() {
   process.stdout.write(`Fable-ous · native Codex plugin
 
 Install once, then run Codex normally:
-  fable-ous install [--codex-only]
+  fable-ous install [--codex-only] [--migrate-legacy]
   codex
 
 Commands:
-  fable-ous install [--codex-only]
+  fable-ous install [--codex-only] [--migrate-legacy]
   fable-ous doctor
   fable-ous style-off        Remove only the reversible Codex communication layer
   fable-ous lint < response.txt
