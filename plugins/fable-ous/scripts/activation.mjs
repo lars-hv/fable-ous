@@ -112,6 +112,21 @@ function restoreDisplacedPath(path, displaced) {
   }
 }
 
+function displacedPathFailure(error, path, displaced, action) {
+  try {
+    const preservedAt = restoreDisplacedPath(path, displaced);
+    return new AggregateError(
+      [error],
+      `Could not safely ${action} managed path; previous bytes preserved at: ${preservedAt}`
+    );
+  } catch (restoreError) {
+    return new AggregateError(
+      [error, restoreError],
+      `Could not safely ${action} managed path; recovery bytes remain at: ${displaced}`
+    );
+  }
+}
+
 function replaceOwnedPath(path, preparedPath, expected) {
   if (!expected.existed) {
     try {
@@ -144,11 +159,15 @@ function replaceOwnedPath(path, preparedPath, expected) {
   try {
     linkSync(preparedPath, path);
   } catch (error) {
-    rmSync(displaced, { force: true });
     if (error?.code === "EEXIST") {
-      throw new Error(`Concurrent change detected while replacing managed path: ${path}`);
+      throw displacedPathFailure(
+        new Error(`Concurrent change detected while replacing managed path: ${path}`),
+        path,
+        displaced,
+        "replace"
+      );
     }
-    throw error;
+    throw displacedPathFailure(error, path, displaced, "replace");
   }
   rmSync(displaced, { force: true });
 }
@@ -176,7 +195,11 @@ function removeOwnedPath(path, options = {}) {
     const preservedAt = restoreDisplacedPath(path, displaced);
     throw new Error(`Concurrent change detected before removing managed path; bytes preserved at: ${preservedAt}`);
   }
-  rmSync(displaced, options);
+  try {
+    rmSync(displaced, options);
+  } catch (error) {
+    throw displacedPathFailure(error, path, displaced, "remove");
+  }
   activeOwnedTransaction?.record(path, { path, existed: false });
 }
 
