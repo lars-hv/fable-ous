@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, cpSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -570,6 +570,44 @@ exit 0
   assert.equal(existsSync(join(codexHome, "fable-ous")), false);
 });
 
+test("public install rejects absent aliases through symlinked parents before host mutation", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-parent-alias-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const realParent = join(root, "real");
+  const aliasParent = join(root, "alias");
+  const invocationLog = join(root, "codex-invoked.log");
+  mkdirSync(bin);
+  mkdirSync(realParent);
+  symlinkSync(realParent, aliasParent);
+  const { entry } = installCodexArtifact(codexHome);
+  writeCodexInstallCommand(join(bin, "codex"), { installed: [entry] }, `
+printf invoked >> '${invocationLog}'
+`);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: bin,
+        CODEX_HOME: codexHome,
+        FABLE_OUS_AGENTS_PATH: join(realParent, "shared"),
+        FABLE_OUS_CODEX_CONFIG_PATH: join(aliasParent, "shared")
+      }
+    }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /distinct|same managed path|path collision|alias/i);
+  assert.equal(existsSync(invocationLog), false, "Codex was invoked before canonical path preflight failed");
+  assert.equal(existsSync(join(realParent, "shared")), false);
+});
+
 test("public install and style-off reject a stale legacy marker beside a fenced user example", {
   skip: process.platform === "win32"
 }, () => {
@@ -675,6 +713,46 @@ test("public style-off fails closed when native preference rollback evidence is 
     before
   );
   assert.equal(existsSync(nativeMarkerPath), false);
+});
+
+test("public style-off rejects rollback markers from another target", () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-style-off-target-binding-"));
+  const codexHome = join(root, "codex-home");
+  const env = { CODEX_HOME: codexHome };
+  ensureNativeCodexPreferences({ env });
+  ensureCodexStyleLayer({ env });
+  const secondAgents = join(root, "second-AGENTS.md");
+  const secondConfig = join(root, "second-config.toml");
+  writeFileSync(secondAgents, "# Second owner file\n");
+  writeFileSync(secondConfig, 'personality = "friendly"\nhide_agent_reasoning = true\nowner_value = 7\n');
+  const watched = [
+    join(codexHome, "AGENTS.md"),
+    join(codexHome, "config.toml"),
+    join(codexHome, "fable-ous", "standard.json"),
+    join(codexHome, "fable-ous", "native-preferences.json"),
+    secondAgents,
+    secondConfig
+  ];
+  const before = watched.map((path) => readFileSync(path));
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "style-off"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CODEX_HOME: codexHome,
+        FABLE_OUS_AGENTS_PATH: secondAgents,
+        FABLE_OUS_CODEX_CONFIG_PATH: secondConfig
+      }
+    }
+  );
+
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /target|binding|rollback evidence|cannot safely/i);
+  assert.deepEqual(watched.map((path) => readFileSync(path)), before);
+  assert.doesNotMatch(result.stdout, /restored its managed Codex communication settings/i);
 });
 
 test("public style-off restores a legacy AGENTS file byte-for-byte and keeps its rollback backup", () => {
@@ -1161,6 +1239,68 @@ syncBuiltinESMExports();
     before
   );
   assert.doesNotMatch(result.stdout, /restored its managed Codex communication settings/i);
+});
+
+test("install preserves an open-descriptor owner edit after displacement", {
+  skip: process.platform === "win32"
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), "fable-ous-install-open-descriptor-"));
+  const bin = join(root, "bin");
+  const codexHome = join(root, "codex-home");
+  const configPath = join(codexHome, "config.toml");
+  const preloadPath = join(root, "open-descriptor.cjs");
+  const original = 'personality = "pragmatic"\n';
+  const ownerToken = "owner-open-descriptor-token\n";
+  mkdirSync(bin);
+  mkdirSync(codexHome, { recursive: true });
+  const { entry } = installCodexArtifact(codexHome);
+  writeCodexInstallCommand(join(bin, "codex"), { installed: [entry] });
+  writeFileSync(configPath, original);
+  writeFileSync(preloadPath, `
+const fs = require("node:fs");
+const { syncBuiltinESMExports } = require("node:module");
+const descriptor = fs.openSync(${JSON.stringify(configPath)}, "r+");
+const originalLinkSync = fs.linkSync;
+let injected = false;
+fs.linkSync = function(source, destination) {
+  const result = originalLinkSync(source, destination);
+  if (!injected && destination === ${JSON.stringify(configPath)}) {
+    injected = true;
+    fs.writeSync(descriptor, ${JSON.stringify(ownerToken)}, 0, "utf8");
+  }
+  return result;
+};
+syncBuiltinESMExports();
+`);
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--codex-only"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: bin,
+        CODEX_HOME: codexHome,
+        NODE_OPTIONS: `--require=${preloadPath}`
+      }
+    }
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const recoveries = readdirSync(codexHome)
+    .filter((name) => name.startsWith("config.toml.fable-ous-displaced-"))
+    .map((name) => join(codexHome, name));
+  assert.equal(
+    recoveries.some((path) => readFileSync(path, "utf8").includes(ownerToken)),
+    true,
+    "the old inode must retain a pathname after an owner writes through an open descriptor"
+  );
+  assert.equal(
+    recoveries.every((path) => (lstatSync(path).mode & 0o7777) === 0o600),
+    true,
+    "recovery links containing owner bytes must be private"
+  );
 });
 
 test("a late filesystem race still rolls back newly applied native preferences", {

@@ -80,8 +80,9 @@ test("installs one reversible Codex instruction block and stays idempotent", () 
   assert.equal(content.split(MANAGED_BLOCK_START).length - 1, 1);
   assert.equal(content.split(MANAGED_BLOCK_END).length - 1, 1);
   const marker = JSON.parse(readFileSync(join(paths.configDir, "standard.json"), "utf8"));
-  assert.equal(marker.schema, 2);
+  assert.equal(marker.schema, 3);
   assert.match(marker.binding, /^[0-9a-f]{32}$/);
+  assert.match(marker.targetBinding, /^[0-9a-f]{64}$/);
   assert.match(content, new RegExp(`codex-style:boundary:${marker.binding}`));
   assert.match(content, /completeness and clarity matter more than shortness/i);
   assert.match(content, /wording and presentation only/i);
