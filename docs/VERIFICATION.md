@@ -1,6 +1,6 @@
 # Fable-ous verification
 
-Candidate 0.2.6 is a native-plugin-only release. The separate Focus/Strict Codex SDK client, prompt runner, model launchers, clean-route wrapper, and `@openai/codex-sdk` dependency have been removed.
+Candidate 0.2.7 is a native-plugin-only release. The separate Focus/Strict Codex SDK client, prompt runner, model launchers, clean-route wrapper, and `@openai/codex-sdk` dependency remain removed. This release adds only an explicit PG product-decision skill; it adds no runtime, hook, or model call and does not change the communication contract evaluated in 0.2.6.
 
 ## Product boundary
 
@@ -42,7 +42,7 @@ The same coding probe exposed an external-harness confound: Maestro's Stop hook 
 
 That matched A/B passed all 12/12 hard gates on both routes across four code tasks, two diagnoses, two product judgments, two proof judgments, and two irreversible-action boundaries. There were no harness failures. The older Fable contract used 743 final words versus 893 for baseline, a 16.8% reduction, and a randomized blind preference pass selected Fable-ous in 7/12 pairs (58.3%). Its losses showed that word reduction was the wrong primary objective: one answer skipped useful inspection, while another compressed away decisive evidence.
 
-The current 0.2.6 communication contract has now completed the same 12-case / 24-arm native run: both routes again passed 12/12 hard gates. Baseline used 890 final-answer words and Fable-ous used 999. An exact Claude Opus 5 blind judge chose Fable-ous 7 times, baseline 3 times, and tied 2, a tie-adjusted 66.7%. That is encouraging but below the 70% improvement gate. A one-sentence evidence-grounding experiment kept both hard gates at 12/12 but scored only 33.3%; the sentence was removed. The release therefore claims compatibility and a communication preference, not proven stable superiority or lower token use.
+The 0.2.6 communication contract completed the same 12-case / 24-arm native run: both routes again passed 12/12 hard gates. Baseline used 890 final-answer words and Fable-ous used 999. An exact Claude Opus 5 blind judge chose Fable-ous 7 times, baseline 3 times, and tied 2, a tie-adjusted 66.7%. That is encouraging but below the 70% improvement gate. A one-sentence evidence-grounding experiment kept both hard gates at 12/12 but scored only 33.3%; the sentence was removed. The 0.2.7 communication bytes are unchanged, so the release claims compatibility and a communication preference, not proven stable superiority or lower token use.
 
 The revised contract was also tested against the strongest suspected regression: making Sol less likely to inspect useful optional evidence. Three matched baseline runs and three current-Fable runs used the same Codex 0.150.1, GPT-5.6 Sol xhigh, friendly personality, resolved low verbosity, isolated fixture, and prompt. Both routes opened the available customer-context file 0/3 times, while all six final answers remained direct, useful, quiet, and left no obvious explanatory follow-up. Mean final length was 58.0 baseline words and 60.7 Fable words. This rules out an obvious Fable-only suppression in that probe, but the shared zero-inspection floor means it does not prove full equivalence.
 
