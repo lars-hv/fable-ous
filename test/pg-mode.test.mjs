@@ -11,7 +11,7 @@ function read(relativePath) {
 }
 
 function body(markdown) {
-  return markdown.replace(/^---\n[\s\S]*?\n---\n+/, "");
+  return markdown.replace(/\r\n/g, "\n").replace(/^---\n[\s\S]*?\n---\n+/, "");
 }
 
 test("PG mode is discoverable but explicit-only in Codex and Claude Code", () => {
@@ -26,6 +26,12 @@ test("PG mode is discoverable but explicit-only in Codex and Claude Code", () =>
   assert.match(codexMetadata, /\$pg-mode/);
   assert.match(claudeCommand, /^disable-model-invocation: true$/m);
   assert.match(skill, /do not silently activate it/i);
+  assert.equal(body(skill), body(claudeCommand));
+});
+
+test("PG mode parity survives Windows CRLF checkout", () => {
+  const skill = read("SKILL.md").replace(/\n/g, "\r\n");
+  const claudeCommand = readFileSync(CLAUDE_COMMAND, "utf8").replace(/\n/g, "\r\n");
   assert.equal(body(skill), body(claudeCommand));
 });
 
