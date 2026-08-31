@@ -231,6 +231,16 @@ test("public lint accepts a scan-friendly Markdown list within the attention bud
   assert.equal(result.status, 0, result.stdout || result.stderr);
 });
 
+test("public lint accepts an explicitly resolved historical failure", () => {
+  const cli = fileURLToPath(new URL("bin/fable-ous.mjs", ROOT));
+  const response = [
+    Array.from({ length: 40 }, (_, index) => `context${index}`).join(" "),
+    "The earlier check failed but recovered; the final result passed."
+  ].join(" ");
+  const result = spawnSync(process.execPath, [cli, "lint"], { encoding: "utf8", input: response });
+  assert.equal(result.status, 0, result.stdout || result.stderr);
+});
+
 test("the default CLI route explains the plugin instead of replacing Codex", () => {
   assert.equal(parseArgs([]).command, "help");
   assert.equal(parseArgs(["install"]).command, "install");

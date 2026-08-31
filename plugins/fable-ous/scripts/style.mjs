@@ -49,7 +49,12 @@ export function analyzeStyle(text = "", { allowLong = false, previousMessages = 
   }
 
   const caveats = value.matchAll(/\b(?:not (?:finished|ready|complete)|still (?:missing|blocked)|failed|failure|blocked|unfinished|ikke (?:ferdig|klar)|fortsatt (?:mangler|blokkert)|feil(?:et)?|mislyktes|gjenstår)\b/gi);
-  if ([...caveats].some((caveat) => words(value.slice(0, caveat.index)).length >= 40)) {
+  const buriedCaveat = [...caveats].some((caveat) => {
+    if (words(value.slice(0, caveat.index)).length < 40) return false;
+    const sentenceTail = value.slice(caveat.index).split(/[.!?\n]/u, 1)[0];
+    return !/\b(?:but|men)\s+(?:(?:was|is|has been|later|ble|er)\s+)?(?:recovered|resolved|fixed|passed|gjenopprettet|løst|rettet|bestod)\b/i.test(sentenceTail);
+  });
+  if (buriedCaveat) {
     issues.push({ code: "buried-caveat", severity: "high", message: "A material caveat appears after the first 40 words." });
   }
 
