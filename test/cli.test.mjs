@@ -178,6 +178,59 @@ test("public CLI presents Fable-ous as a native Codex plugin", () => {
   assert.doesNotMatch(result.stdout, /Focus Mode|fable-ous focus|fable-ous strict|fable-ous ask/i);
 });
 
+test("public lint honors long-form and previous-message context", () => {
+  const cli = fileURLToPath(new URL("bin/fable-ous.mjs", ROOT));
+  const longForm = Array.from({ length: 3 }, (_, paragraph) => (
+    Array.from({ length: 41 }, (_, word) => `useful${paragraph}-${word}`).join(" ")
+  )).join("\n\n");
+  const longResult = spawnSync(process.execPath, [cli, "lint", "--allow-long"], {
+    encoding: "utf8",
+    input: longForm
+  });
+  assert.equal(longResult.status, 0, longResult.stdout || longResult.stderr);
+
+  const previous = Array.from({ length: 30 }, (_, index) => `context${index}`).join(" ");
+  const repeatedResult = spawnSync(
+    process.execPath,
+    [cli, "lint", "--previous-message", previous],
+    { encoding: "utf8", input: previous }
+  );
+  assert.equal(repeatedResult.status, 1, repeatedResult.stderr);
+  assert.ok(JSON.parse(repeatedResult.stdout).issues.some((issue) => issue.code === "repeated-status"));
+});
+
+test("public lint catches every buried caveat at the exact attention boundary", () => {
+  const cli = fileURLToPath(new URL("bin/fable-ous.mjs", ROOT));
+  const recoveredThenBlocked = [
+    "The earlier check failed but recovered.",
+    Array.from({ length: 40 }, (_, index) => `context${index}`).join(" "),
+    "Deployment is blocked."
+  ].join(" ");
+  const recoveredResult = spawnSync(process.execPath, [cli, "lint"], {
+    encoding: "utf8",
+    input: recoveredThenBlocked
+  });
+  assert.equal(recoveredResult.status, 1, recoveredResult.stderr);
+  assert.ok(JSON.parse(recoveredResult.stdout).issues.some((issue) => issue.code === "buried-caveat"));
+
+  const exactBoundary = `${Array.from({ length: 40 }, (_, index) => `context${index}`).join(" ")} not finished`;
+  const boundaryResult = spawnSync(process.execPath, [cli, "lint"], {
+    encoding: "utf8",
+    input: exactBoundary
+  });
+  assert.equal(boundaryResult.status, 1, boundaryResult.stderr);
+  assert.ok(JSON.parse(boundaryResult.stdout).issues.some((issue) => issue.code === "buried-caveat"));
+});
+
+test("public lint accepts a scan-friendly Markdown list within the attention budget", () => {
+  const cli = fileURLToPath(new URL("bin/fable-ous.mjs", ROOT));
+  const list = Array.from({ length: 10 }, (_, item) => (
+    `- ${Array.from({ length: 10 }, (_, word) => `point${item}-${word}`).join(" ")}`
+  )).join("\n");
+  const result = spawnSync(process.execPath, [cli, "lint"], { encoding: "utf8", input: list });
+  assert.equal(result.status, 0, result.stdout || result.stderr);
+});
+
 test("the default CLI route explains the plugin instead of replacing Codex", () => {
   assert.equal(parseArgs([]).command, "help");
   assert.equal(parseArgs(["install"]).command, "install");

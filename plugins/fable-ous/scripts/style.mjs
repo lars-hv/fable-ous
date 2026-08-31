@@ -36,7 +36,9 @@ export function analyzeStyle(text = "", { allowLong = false, previousMessages = 
     issues.push({ code: "too-long", severity: "high", message: `It is ${responseWords.length} words; routine replies should preserve the essential truth with less reading.` });
   }
 
-  const denseParagraph = value.split(/\n\s*\n/u).find((paragraph) => words(paragraph).length > 90);
+  const denseParagraph = value
+    .split(/\n\s*\n|\n(?=\s*(?:[-*+]|\d+[.)])\s+)/u)
+    .find((paragraph) => words(paragraph).length > 90);
   if (denseParagraph) {
     issues.push({ code: "dense-paragraph", severity: "medium", message: "It contains a paragraph over 90 words that is difficult to scan." });
   }
@@ -46,8 +48,8 @@ export function analyzeStyle(text = "", { allowLong = false, previousMessages = 
     issues.push({ code: "progress-chatter", severity: "high", message: "It narrates routine progress instead of waiting for a meaningful delta." });
   }
 
-  const caveat = /\b(?:not (?:finished|ready|complete)|still (?:missing|blocked)|failed|failure|blocked|unfinished|ikke (?:ferdig|klar)|fortsatt (?:mangler|blokkert)|feil(?:et)?|mislyktes|gjenstår)\b/i.exec(value);
-  if (caveat && words(value.slice(0, caveat.index)).length > 40) {
+  const caveats = value.matchAll(/\b(?:not (?:finished|ready|complete)|still (?:missing|blocked)|failed|failure|blocked|unfinished|ikke (?:ferdig|klar)|fortsatt (?:mangler|blokkert)|feil(?:et)?|mislyktes|gjenstår)\b/gi);
+  if ([...caveats].some((caveat) => words(value.slice(0, caveat.index)).length >= 40)) {
     issues.push({ code: "buried-caveat", severity: "high", message: "A material caveat appears after the first 40 words." });
   }
 
