@@ -11,9 +11,12 @@ Fable-ous is independent open-source software. It is not affiliated with, endors
 ## Install
 
 ```bash
-npm install --global fable-ous@latest
+npm install --global github:lars-hv/fable-ous
 fable-ous install
 ```
+
+The npm package is not published yet. The GitHub command above installs the current public release
+directly from this repository without implying that an npm release exists.
 
 Start a fresh native Codex session:
 

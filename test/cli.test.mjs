@@ -186,7 +186,8 @@ test("the default CLI route explains the plugin instead of replacing Codex", () 
 test("public onboarding keeps ordinary Codex as the product entrypoint", () => {
   const readme = readFileSync(new URL("README.md", ROOT), "utf8");
 
-  assert.match(readme, /npm install --global fable-ous@latest/);
+  assert.match(readme, /npm install --global github:lars-hv\/fable-ous/);
+  assert.match(readme, /npm package is not published yet/i);
   assert.match(readme, /\bcodex\b/);
   assert.match(readme, /native Codex/i);
   assert.doesNotMatch(readme, /Focus Mode|official Codex SDK|fable-ous strict|fable-ous ask/i);
