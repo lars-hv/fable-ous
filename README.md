@@ -37,6 +37,7 @@ Fable-ous uses only supported host controls:
 - native `hide_agent_reasoning = true`;
 - no lifecycle hooks, so Fable-ous contributes no hook-status receipts;
 - a read-only `voice-status` skill that can answer explicit Fable-ous status and troubleshooting questions;
+- an explicit-only `PG mode` product lens for testing demand and cutting unnecessary code before implementation;
 - a forced Claude Code output style that preserves Claude's coding instructions.
 
 The communication contract asks the working model to explain host-established results in human terms, make completion status clear, include the proof that creates trust, and omit internal process noise. It does not instruct the model what work to choose or how to perform it. It does not impose a word limit; a complete answer is better than a short vague receipt.
@@ -72,6 +73,17 @@ Because model language is probabilistic, Fable-ous can guarantee installation an
 ## Claude compatibility
 
 Claude Code receives the same communication contract through a forced output style with `keep-coding-instructions: true`. Fable-ous does not launch Claude, select a model, remove other plugins, or bypass user/project settings.
+
+## PG mode
+
+PG mode is an optional product lens, not a persona. Invoke it explicitly when you want to challenge whether something should be built, identify the named user and painful job, or find a faster manual proof before writing code:
+
+```text
+Codex:      $pg-mode
+Claude Code: /pg-mode
+```
+
+It synthesizes product principles from Paul Graham's published essays without impersonating him or reproducing the essays. It never auto-activates, calls another model, adds hooks, blocks work, or gains authority over code, tests, review, safety, authorization, or completion.
 
 ## Commands
 
