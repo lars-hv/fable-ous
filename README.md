@@ -40,7 +40,7 @@ Fable-ous uses only supported host controls:
 - an explicit-only `PG mode` product lens for testing demand and cutting unnecessary code before implementation;
 - a forced Claude Code output style that preserves Claude's coding instructions.
 
-The communication contract asks the working model to explain host-established results in human terms, make completion status clear, include the proof that creates trust, and omit internal process noise. It does not instruct the model what work to choose or how to perform it. It does not impose a word limit; a complete answer is better than a short vague receipt.
+The communication contract asks the working model to explain host-established results in human terms, make completion status clear, include the proof that creates trust, and omit internal process noise. It does not instruct the model what work to choose or how to perform it. Routine replies target a 120-word attention budget, while requested depth, safety, evidence, and consequential decisions may be longer. A complete answer is better than a short vague receipt; the goal is the minimum sufficient truth, not minimum length.
 
 ### The human-usefulness standard
 

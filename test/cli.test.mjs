@@ -66,7 +66,7 @@ function installCodexArtifact(codexHome, {
 }
 
 function installClaudeArtifact(root, {
-  version = "0.2.7",
+  version = "0.2.8",
   hooks = false,
   replacementClient = false,
   unexpectedCapability = false
@@ -200,7 +200,7 @@ test("public onboarding keeps ordinary Codex as the product entrypoint", () => {
 test("npm metadata is publishable and contains no replacement Codex runtime", () => {
   const packageJson = JSON.parse(readFileSync(new URL("package.json", ROOT), "utf8"));
 
-  assert.equal(packageJson.version, "0.2.7");
+  assert.equal(packageJson.version, "0.2.8");
   assert.notEqual(packageJson.private, true);
   assert.equal(packageJson.bin["fable-ous"], "bin/fable-ous.mjs");
   assert.equal(packageJson.dependencies?.["@openai/codex-sdk"], undefined);

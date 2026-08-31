@@ -84,7 +84,8 @@ test("installs one reversible Codex instruction block and stays idempotent", () 
   assert.match(marker.binding, /^[0-9a-f]{32}$/);
   assert.match(marker.targetBinding, /^[0-9a-f]{64}$/);
   assert.match(content, new RegExp(`codex-style:boundary:${marker.binding}`));
-  assert.match(content, /completeness and clarity matter more than shortness/i);
+  assert.match(content, /minimum sufficient truth/i);
+  assert.match(content, /within the first 40 words/i);
   assert.match(content, /wording and presentation only/i);
   assert.match(content, /neither selects work nor changes/i);
   assert.match(content, /user-visible handoff/i);
@@ -975,7 +976,12 @@ test("Codex and Claude carry the same communication-only outcome contract", () =
   for (const pattern of [
     /warm[^\n]*plain|plain[^\n]*warm/i,
     /stellar[^\n]*intuitive expert friend/i,
-    /completeness and clarity matter more than shortness/i,
+    /full day of reading/i,
+    /minimum sufficient truth/i,
+    /automated task notifications and ordinary agent progress are not milestones/i,
+    /delta-only progress/i,
+    /within the first 40 words/i,
+    /one idea per short paragraph/i,
     /wording and presentation only/i,
     /neither selects work nor changes/i,
     /genuinely needs owner input/i,
