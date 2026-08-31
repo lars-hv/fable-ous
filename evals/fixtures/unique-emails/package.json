@@ -1,0 +1,6 @@
+{
+  "name": "fable-ous-unique-emails-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" }
+}

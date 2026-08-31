@@ -1,0 +1,7 @@
+10:00:00 app send request message=42 attempt=1 idempotency_key=none
+10:00:01 provider accepted message=42 provider_id=A71
+10:00:31 app timed out waiting for provider receipt
+10:00:32 retry scheduled message=42 attempt=2 idempotency_key=none
+10:00:33 provider accepted message=42 provider_id=A72
+10:00:34 receipt received provider_id=A72
+10:04:00 delayed receipt received provider_id=A71

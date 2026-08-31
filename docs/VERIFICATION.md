@@ -1,65 +1,57 @@
 # Fable-ous verification
 
-Verified on 2026-08-27 with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Claude Code 2.1.246, Node.js 24.16.0, and macOS.
+Candidate 0.2.6 is a native-plugin-only release. The separate Focus/Strict Codex SDK client, prompt runner, model launchers, clean-route wrapper, and `@openai/codex-sdk` dependency have been removed.
 
-## What passed
+## Product boundary
 
-- The deterministic suite passes 28 tests covering Codex injection, quiet-pulse routing, task routing, coordinated Stop rewrites, strict buffering, exact-output preservation, explicit long-form preservation, Claude Opus activation, unknown-model fail-closed behavior, and native Fable's minimal profile.
-- Both official plugin validators pass.
-- The user-level Codex and Claude installations are enabled and point at the current plugin versions.
-- A fresh standard Codex session loaded the plugin and produced an outcome-first final recommendation.
-- Codex strict mode exposed no raw progress output and returned only the final rendered answer.
-- The quiet-pulse contract is covered by deterministic guidance and eval cases: client tool receipts are not paraphrased, and visible updates are reserved for material state changes.
-- In an isolated coding fixture, the existing test failed before the Codex change and passed 2/2 afterward. The strict renderer was read-only and did not alter the patch.
-- A live Claude Opus 5 wrapper session produced a 148-word Norwegian answer with the recommendation first, plain language, and no routine permission question.
-- The Fable launcher and hook fixtures select only the quiet-pulse profile and bypass full style rewriting deterministically.
+Fable-ous shapes communication through the normal Codex instruction stack and supported native settings. It does not own the terminal stream, start a second client, route work, auto-continue, classify command truth, change coding instructions, or replace host safety and approval controls.
 
-## Directional clean-route check
+The installer applies two reversible native preferences:
 
-A fresh paired Codex fixture used the same Norwegian file task with Fable-ous forced off and on. Both routes created the exact five-byte `READY` artifact and verified it successfully. The off route emitted two model-authored progress messages before its 13-word final answer. The on route emitted one before its 17-word final answer: 50% fewer in this single case. A failed internal patch attempt remained visible in the client event stream and Codex recovered, so the quieter route did not hide the failure or change the artifact outcome. The on run used more output tokens, so this result is a transcript improvement, not a token-saving claim.
+- `personality = "friendly"`
+- `hide_agent_reasoning = true`
 
-This one pair is evidence for the specific mechanism, not a general percentage claim. The planned cross-model gate is a blinded 24-case clean-route bakeoff with identical fixtures for Opus 5, Sonnet 5, native Fable, and GPT-5.6 Sol. Code/test correctness, authorization, honest completion, and disclosure of material failures are hard gates before style preference is scored.
+The installer deliberately leaves `model_verbosity` to the user. The preferences and communication contract affect presentation. Model choice, reasoning effort, tools, plugins, hooks, sandbox, approvals, coding, testing, verification, and completion judgment remain native Codex responsibilities.
 
-## Four-model coding check (0.1.5)
+## Deterministic release gates
 
-The same failing `finite-average` fixture was run in fresh directories with GPT-5.6 Sol, Claude Opus 5, Claude Sonnet 5, and Claude Fable 5. The baseline has one passing and three failing tests. Every model changed only the implementation and reached the same host-verified 4/4 green result; none changed the tests.
+Portable CI and `npm run check` enforce JavaScript syntax, Node tests, native-plugin boundary assertions, version alignment, package contents, dependency audit, and the absence of the replacement client and lifecycle hooks.
 
-| Route | Model-authored progress before final | Final words | Clean-route verdict |
-| --- | ---: | ---: | --- |
-| Opus 5, full profile | 1 | 107 | Directionally good |
-| Fable 5, quiet profile | 1 | 76 | Directionally good |
-| Sonnet 5, full profile with Maestro/Superpowers | 7 | 167 | Too noisy |
-| Sol, standard Codex with Maestro | 5 | 50 | Too noisy before the final |
-| Sol, strict Codex | 2 curated pulses | about 50 | Clean transcript; formal receipt remained blocked |
+The release operator additionally requires:
 
-The strict Sol route hid raw narration, exposed a failed check and the file-change milestone, and preserved the final `NOT VERIFIED` limitation: local tests passed, but Maestro could not write its receipt outside the workspace sandbox. This is the intended transparency boundary.
+- Bun native-plugin boundary proof;
+- Codex and Claude plugin validators;
+- clean `git diff --check`;
+- a cachebusted installed plugin whose runtime bytes match the source candidate;
+- fresh-session doctor evidence.
 
-The Fable and Sonnet finals misstated the exact number of baseline failures after reading truncated command output, although the current 4/4 green result was independently re-run and confirmed. Therefore version 0.1.5 passes this fixture's code-quality oracle but does **not** justify a universal reporting-accuracy or Fable-parity claim. The Sonnet and standard Sol noise came mainly from other mandatory verifier/skill hooks, which a standard style plugin cannot retract after streaming.
+The tests cover reversible instruction installation without a full `AGENTS.md` backup, native preference installation and restoration, rollback-evidence validation, user changes made after installation, the absence of lifecycle hooks, forced Claude output style with coding instructions preserved, CLI installation/update behavior, installed-artifact binding in Doctor, package boundaries, and the absence of a replacement Codex runtime.
 
-## Typical-user isolation
+## Existing model evidence
 
-The two noisy routes were repeated with only Fable-ous enabled:
+Earlier Sol runs showed that the communication contract can produce outcome-first answers and that a synthetic coding fixture can move from 1/4 to 4/4 while preserving the test-file SHA-256. Those runs are encouraging code-quality evidence, but some used the removed Focus presentation path and therefore do not prove the 0.2.6 native-plugin experience.
 
-- GPT-5.6 Sol in a clean temporary Codex home loaded only Fable-ous, emitted one progress message and one 30-word final, and passed 4/4 tests.
-- Claude Sonnet 5 with all other user plugins disabled loaded only Fable-ous, emitted no progress prose before its 41-word final, and passed 4/4 tests.
+The previous native Codex 0.150.1 / GPT-5.6 Sol xhigh evaluation established a compatibility baseline for the pre-0.2.5 contract:
 
-This supports a public beta claim that the low-friction plugin materially cleans up ordinary sessions. It also confirms that Lars's heavier Maestro/Superpowers environment needs strict Codex for guaranteed transcript control; those additional hooks, not Fable-ous itself, created most of the extra turns.
+- a no-tool product judgment returned one direct recommendation and one concrete next step in two short paragraphs;
+- the finite-average fixture moved from 1/4 to 4/4 tests with a minimal implementation change;
+- the test file remained byte-identical with SHA-256 `2bf12d36220ca5628fc004f6786149f1d80a500151312132f6cda6d588d956c2`;
+- host rerun confirmed 4/4 after the model turn.
 
-## Platform findings
+The same coding probe exposed an external-harness confound: Maestro's Stop hook replaced Sol's concise successful final with `NOT VERIFIED` because the isolated fixture was not a tracked Git repository. This did not change the code or test result, but it proved that a separate blocking Stop hook could override Fable-ous presentation. The Maestro 0.47.70 candidate removes that generic completion hook from both clients while retaining action-boundary safety.
 
-- Codex hooks can inject developer context and ask for one more Stop pass, but ordinary Codex may already have streamed process commentary. Strict mode is required to hide the raw response.
-- Claude Code documents an optional `model` field for SessionStart. Claude Code 2.1.246 omitted it in a real `--model claude-opus-5` run, so a plugin cannot safely infer the model every time.
-- `fable-ous opus` declares Opus out of band and activates the layer without a settings change. `fable-ous fable` explicitly disables it. The generic Claude launcher refuses to guess.
-- Claude's built-in Concise and Proactive output styles are useful prompt controls, not changes to model knowledge or personality. Fable-ous combines their useful behaviors and keeps the coding instructions.
+That matched A/B passed all 12/12 hard gates on both routes across four code tasks, two diagnoses, two product judgments, two proof judgments, and two irreversible-action boundaries. There were no harness failures. The older Fable contract used 743 final words versus 893 for baseline, a 16.8% reduction, and a randomized blind preference pass selected Fable-ous in 7/12 pairs (58.3%). Its losses showed that word reduction was the wrong primary objective: one answer skipped useful inspection, while another compressed away decisive evidence.
 
-## What is not proven
+The current 0.2.6 communication contract has now completed the same 12-case / 24-arm native run: both routes again passed 12/12 hard gates. Baseline used 890 final-answer words and Fable-ous used 999. An exact Claude Opus 5 blind judge chose Fable-ous 7 times, baseline 3 times, and tied 2, a tie-adjusted 66.7%. That is encouraging but below the 70% improvement gate. A one-sentence evidence-grounding experiment kept both hard gates at 12/12 but scored only 33.3%; the sentence was removed. The release therefore claims compatibility and a communication preference, not proven stable superiority or lower token use.
 
-- The project does not guarantee identical Fable behavior or universal preference.
-- It has not yet passed a blinded evaluation against native Fable on real user conversations.
-- Standard Codex cannot guarantee a clean transcript before the final answer.
-- Claude model switches inside an existing session are not reliably observable; start a new wrapper session after switching.
-- Compatibility beyond the versions above requires a fresh matrix run.
+The revised contract was also tested against the strongest suspected regression: making Sol less likely to inspect useful optional evidence. Three matched baseline runs and three current-Fable runs used the same Codex 0.150.1, GPT-5.6 Sol xhigh, friendly personality, resolved low verbosity, isolated fixture, and prompt. Both routes opened the available customer-context file 0/3 times, while all six final answers remained direct, useful, quiet, and left no obvious explanatory follow-up. Mean final length was 58.0 baseline words and 60.7 Fable words. This rules out an obvious Fable-only suppression in that probe, but the shared zero-inspection floor means it does not prove full equivalence.
 
-## Release gate
+A separate three-run probe with native `model_verbosity = "medium"` used the decisive customer facts in only one run. Fable-ous therefore does not take ownership of verbosity and does not claim to solve optional evidence discovery. That behavior belongs to the working model and native harness; adding hooks or a controller to force it would violate the communication-only product boundary.
 
-Public beta is reasonable after repository privacy checks and a clean commit. A stronger effectiveness claim requires a blinded 30-prompt evaluation and repeated preference from at least five external users.
+No native Fable-model run is required because the product changes Sol's communication layer, not its model route.
+
+## Honest limits
+
+The plugin cannot hide native Codex tool receipts, force identical prose on every probabilistic model turn, overrule another plugin's higher-priority hook, or guarantee compatibility with future clients without versioned tests.
+
+Do not claim lower total token use or unchanged code quality from style preference alone. Code correctness, required tests, safety, authorization, and honest completion remain hard gates that style cannot compensate for.

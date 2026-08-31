@@ -1,18 +1,92 @@
 # Fable-ous
 
-Fable-ous makes Codex and Claude Code models communicate with more clarity, judgment, compression, and forward motion.
+Fable-ous is a communication-only booster that aims to make native Codex and Claude Code feel like a stellar, intuitive expert friend: outcome-first, warm, clear, and honest. It is designed to change communication and presentation, not improve code quality or replace the host's coding, testing, safety, blocking, or completion controls.
 
-It is built for people who want the agent to lead with the result, infer the likely goal, avoid process narration, continue through safe reversible work, and stop only at a real decision boundary.
+The boundary is intentionally strict, but model instructions are probabilistic: wording guidance can sometimes influence model behavior. Fable-ous therefore makes no code-quality claim and does not guarantee that coding behavior is bit-for-bit unchanged. Tests, reviews, safety gates, and completion evidence must remain owned by Codex, Claude Code, and the user's existing workflow.
 
-Its progress rule is a quiet pulse: the client may keep showing its normal tool receipts, while the model speaks only when a finding, risk, blocker, decision, or direction materially changes. It does not repeat shell counts or running-job inventories.
+The product is deliberately small: install the plugin, then keep using ordinary `codex`. There is no replacement terminal, SDK client, renderer model, controller, model router, or hidden continuation loop.
 
 Fable-ous is independent open-source software. It is not affiliated with, endorsed by, or derived from Anthropic or the Claude Fable model. The name describes the intended experience; it does not claim model equivalence.
 
-## Two modes
+## Install
 
-### Standard plugin
+```bash
+npm install --global github:lars-hv/fable-ous
+fable-ous install
+```
 
-The plugin injects a short communication contract at session start, adds task-specific guidance for each prompt, and catches a small set of measurable final-answer failures.
+The npm package is not published yet. The GitHub command above installs the current public release
+directly from this repository without implying that an npm release exists.
+
+Start a fresh native Codex session:
+
+```bash
+codex
+```
+
+The `fable-ous install` step is required. Codex plugins do not currently provide an automatic output-style surface equivalent to Claude Code's forced output style, so the installer applies the reversible global Codex communication block and native settings.
+
+The installer also adds the compatible Claude Code output style when Claude Code is available. Use `fable-ous install --codex-only` for Codex only.
+
+## What it changes
+
+Fable-ous uses only supported host controls:
+
+- one reversible communication block in the user's global Codex `AGENTS.md`;
+- native `personality = "friendly"`;
+- native `hide_agent_reasoning = true`;
+- no lifecycle hooks, so Fable-ous contributes no hook-status receipts;
+- a read-only `voice-status` skill that can answer explicit Fable-ous status and troubleshooting questions;
+- a forced Claude Code output style that preserves Claude's coding instructions.
+
+The communication contract asks the working model to explain host-established results in human terms, make completion status clear, include the proof that creates trust, and omit internal process noise. It does not instruct the model what work to choose or how to perform it. It does not impose a word limit; a complete answer is better than a short vague receipt.
+
+### The human-usefulness standard
+
+A good handoff lets the user understand five things without asking another question:
+
+1. What actually happened, in ordinary language?
+2. Is the requested outcome finished, partly finished, or blocked?
+3. What changed for the user, and why does it matter?
+4. What concrete evidence makes that conclusion trustworthy?
+5. What material risk or missing proof remains, and what is the one next action if anything remains?
+
+This is an internal quality standard, not a fixed receipt format. Tone should feel warm and adult-to-adult; detail should be translated into consequences; length should expand when understanding or trust needs it and contract when it does not.
+
+The installer records only the settings it owns. It does not make a full backup copy of `AGENTS.md`; the owned block and rollback markers are sufficient. `fable-ous style-off` restores the prior values when they are still plugin-managed and preserves settings the user changed after installation.
+
+## What it does not change
+
+Fable-ous does not directly configure the selected model, reasoning effort, verbosity preference, code path, tools, plugins, hooks, sandbox, approvals, safety rules, tests, or completion judgment. Because the style is delivered as model instructions, zero behavioral influence cannot be guaranteed.
+
+Codex itself owns native command, file, search, and tool receipts. The current plugin API cannot hide those receipts. Fable-ous reduces model narration and hides supported reasoning events, but it does not patch or rebuild the Codex interface.
+
+Another installed plugin can still show hook statuses or block and replace a final answer. Fable-ous deliberately does not override another plugin's safety or verification hooks; `fable-ous doctor` reports this boundary.
+
+Doctor binds health to the enabled user installation, expected version, active host cache and source bytes. It reports unhealthy instead of "native-only" when the active Codex or Claude artifact is stale, comes from an unbound path, has lifecycle hooks, contains a replacement SDK client, or has lost valid rollback evidence.
+
+For Codex local-marketplace installs, source binding is intentionally strict: the active `plugin.source.path` and marketplace root must resolve to the plugin bundled with the currently running Fable-ous CLI. This prevents a different same-named local checkout from being reported as the verified release.
+
+Because model language is probabilistic, Fable-ous can guarantee installation and native configuration, not identical wording or personality on every turn. Strong style claims require the matched evaluation in [docs/CLEAN-ROUTE-EVAL.md](docs/CLEAN-ROUTE-EVAL.md), with code and safety as hard gates.
+
+## Claude compatibility
+
+Claude Code receives the same communication contract through a forced output style with `keep-coding-instructions: true`. Fable-ous does not launch Claude, select a model, remove other plugins, or bypass user/project settings.
+
+## Commands
+
+```text
+fable-ous install [--codex-only]
+fable-ous doctor
+fable-ous style-off
+fable-ous lint < response.txt
+```
+
+`style-off` removes the reversible Codex `AGENTS.md` block and restores the native Codex settings Fable-ous owned. Claude Code's output style belongs to its installed plugin; disable it with `claude plugin disable fable-ous@fable-ous --scope user`, or remove it with `claude plugin uninstall fable-ous@fable-ous --scope user`.
+
+Running `fable-ous` without a command explains the native plugin flow; it never starts another Codex client.
+
+## Development
 
 ```bash
 git clone https://github.com/lars-hv/fable-ous.git
@@ -20,84 +94,10 @@ cd fable-ous
 npm install
 npm link
 fable-ous install
-```
-
-Start a fresh Codex or Claude Code session after installation.
-
-Fable-ous is always active in Codex. In Claude Code, the SessionStart hook uses the model identifier when Claude provides it: Opus, Sonnet, and other non-Fable models receive the full communication contract. Native Fable receives only the small quiet-pulse contract, preserving its own voice while reducing duplicate progress narration. If Claude omits its model identifier, Fable-ous fails closed and stays off. The bundled Claude output style is available as a manual override but is not forced.
-
-Claude Code 2.1.246 omitted the optional `model` hook field in a real `--model claude-opus-5` run. For guaranteed no-settings activation, launch Opus through Fable-ous:
-
-```bash
-fable-ous opus
-```
-
-Normal Claude arguments pass through:
-
-```bash
-fable-ous opus -p "Give me the direct recommendation"
-fable-ous fable
-fable-ous claude --model claude-sonnet-5
-```
-
-The Fable launcher explicitly selects the quiet-pulse profile; it does not add the renderer or full imitation contract. The generic launcher refuses to guess a model. If you change models inside Claude Code with `/model`, start a new wrapper session; later hooks do not reliably expose model changes.
-
-### Strict mode
-
-Strict mode runs through the official Codex SDK. It buffers the raw Codex response, always renders a communication-only final pass, and shows only that final answer. It may show a small number of deterministic milestone pulses for completed external research, file changes, or failed checks; raw model commentary and tool details stay hidden. Exact-output requests bypass the renderer.
-
-```bash
-fable-ous strict --cwd /path/to/project
-```
-
-For one prompt:
-
-```bash
-fable-ous ask "Give me the direct recommendation" --cwd /path/to/project
-```
-
-Strict mode preserves the user's existing Codex authentication. It uses `model_verbosity=low`, `personality=none`, and the user's current model unless `--model` is provided. The renderer is read-only: it cannot change code, run tools, or upgrade an unverified result into a success claim. It requires one additional Codex turn.
-
-## What the standard plugin cannot do
-
-Codex lifecycle hooks can add developer context and request another pass, but they cannot retract text already streamed by the standard Codex interface. Higher-priority platform instructions also remain authoritative. Use strict mode when only the checked final answer may be visible.
-
-## Claude's built-in controls
-
-Claude Code includes `Concise` and `Proactive` output styles. Concise reduces preamble and narration; Proactive favors action over routine questions. Fable-ous combines those useful behaviors with plain founder-facing language, selective technical detail, real decision boundaries, and preservation of proof. It does not change Claude's knowledge or coding instructions.
-
-## Honest guarantees
-
-Fable-ous can deterministically guarantee activation in Codex, full-versus-quiet routing when Claude reports its model, one-pass Stop gating for measurable style failures on non-Fable models, and hidden raw output in Codex strict mode. The strict renderer is read-only, so communication cleanup cannot alter the code patch.
-
-It cannot guarantee identical model personality, suppress already-streamed commentary in ordinary Codex, detect every mid-session Claude model switch, or remain compatible with future client changes without updates. Public claims should be based on the included tests and versioned compatibility checks, not "works for everyone."
-
-Verified locally with Codex CLI 0.150.1, `@openai/codex-sdk` 0.150.1, Claude Code 2.1.246, and Node.js 24.16.0 on macOS. Claude Code 2.1.237 or newer is recommended for the current output-style controls.
-
-The implementation follows the current official contracts for [Codex hooks](https://learn.chatgpt.com/docs/hooks), the [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [Claude Code hooks](https://code.claude.com/docs/en/hooks), and [Claude Code output styles](https://code.claude.com/docs/en/output-styles).
-
-See the dated [verification report](docs/VERIFICATION.md) for live-test evidence and known limits, and the [clean-route evaluation](docs/CLEAN-ROUTE-EVAL.md) for the cross-model quality gate.
-
-## Commands
-
-```text
-fable-ous install [--codex-only]
-fable-ous doctor
-fable-ous strict [--cwd PATH] [--model MODEL] [--effort LEVEL]
-fable-ous ask "PROMPT" [--cwd PATH] [--model MODEL]
-fable-ous opus [...CLAUDE_ARGS]
-fable-ous fable [...CLAUDE_ARGS]
-fable-ous claude --model MODEL [...CLAUDE_ARGS]
-fable-ous lint < response.txt
-```
-
-## Development
-
-```bash
-npm test
 npm run check
+bun test test/fable-ous-boundary.proof.test.ts
 python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/fable-ous
 claude plugin validate plugins/fable-ous
 ```
 
-Private conversations and preference data do not belong in the repository. The public eval cases are synthetic; personal evals belong under the ignored `evals/private/` directory.
+Private conversations and preference data do not belong in the repository. Public eval cases are synthetic; personal evals belong under the ignored `evals/private/` directory.
