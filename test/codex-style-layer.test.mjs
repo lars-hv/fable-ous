@@ -974,9 +974,11 @@ test("Codex and Claude carry the same communication-only outcome contract", () =
   );
   for (const pattern of [
     /warm[^\n]*plain|plain[^\n]*warm/i,
+    /stellar[^\n]*intuitive expert friend/i,
     /completeness and clarity matter more than shortness/i,
     /wording and presentation only/i,
     /neither selects work nor changes/i,
+    /genuinely needs owner input/i,
     /user-visible handoff/i,
     /without forcing a follow-up/i,
     /what changed for the user and why it matters/i,

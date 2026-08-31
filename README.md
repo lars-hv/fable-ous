@@ -1,6 +1,6 @@
 # Fable-ous
 
-Fable-ous makes native Codex feel calmer, warmer, clearer, and more useful to a human. It is designed to change communication and presentation, not to improve code quality or replace the host's coding and completion controls.
+Fable-ous is a communication-only booster that aims to make native Codex and Claude Code feel like a stellar, intuitive expert friend: outcome-first, warm, clear, and honest. It is designed to change communication and presentation, not improve code quality or replace the host's coding, testing, safety, blocking, or completion controls.
 
 The boundary is intentionally strict, but model instructions are probabilistic: wording guidance can sometimes influence model behavior. Fable-ous therefore makes no code-quality claim and does not guarantee that coding behavior is bit-for-bit unchanged. Tests, reviews, safety gates, and completion evidence must remain owned by Codex, Claude Code, and the user's existing workflow.
 
