@@ -4,3 +4,6 @@ node_modules/
 coverage/
 *.log
 evals/private/
+
+# Local Maestro review artefacts (machine-specific, never publish)
+.maestro/
