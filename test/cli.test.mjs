@@ -336,7 +336,7 @@ exit 0
     chmodSync(executable, 0o700);
   }
 
-  const result = spawnSync(process.execPath, [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install"], {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--with-claude"], {
     encoding: "utf8",
     env: { ...process.env, PATH: bin, CODEX_HOME: codexHome, CLAUDE_CONFIG_DIR: claudeHome }
   });
@@ -367,7 +367,7 @@ exit 0
 
   const result = spawnSync(
     process.execPath,
-    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install"],
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--with-claude"],
     { encoding: "utf8", env: { ...process.env, PATH: bin, CODEX_HOME: codexHome } }
   );
 
@@ -2026,7 +2026,7 @@ exit 0
 
   const result = spawnSync(
     process.execPath,
-    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install"],
+    [fileURLToPath(new URL("bin/fable-ous.mjs", ROOT)), "install", "--with-claude"],
     {
       encoding: "utf8",
       env: { ...process.env, PATH: bin, CODEX_HOME: codexHome, CLAUDE_CONFIG_DIR: claudeHome }

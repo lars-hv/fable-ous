@@ -16,7 +16,7 @@ It deliberately leaves `model_verbosity` under user control.
 
 The package contains no response linter, word-count enforcement, command, skill, hook, replacement client, model call, renderer, router, memory, autonomy rule, or work-selection rule.
 
-Claude compatibility consists only of the same three-sentence output style with `keep-coding-instructions: true`. A Codex-only installation is available through `fable-ous install --codex-only`.
+The default install is Codex-only and does not touch Claude Code. Optional Claude compatibility requires the explicit `fable-ous install --with-claude` flag and consists only of the same three-sentence output style with `keep-coding-instructions: true`.
 
 ## Deterministic gates
 

@@ -41,3 +41,14 @@ test("ships no runtime, linter, command, or skill surface", () => {
   assert.match(help.stdout, /fable-ous doctor/);
   assert.match(help.stdout, /fable-ous style-off/);
 });
+
+test("keeps Claude compatibility explicit instead of reinstalling it by default", () => {
+  const source = readFileSync(new URL("src/cli.mjs", ROOT), "utf8");
+  assert.match(source, /options\["with-claude"\]/);
+  assert.doesNotMatch(source, /!options\["codex-only"\]/);
+
+  const cli = fileURLToPath(new URL("bin/fable-ous.mjs", ROOT));
+  const help = spawnSync(process.execPath, [cli, "help"], { encoding: "utf8" });
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /install \[--with-claude\]/);
+});

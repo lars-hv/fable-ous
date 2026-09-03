@@ -21,7 +21,7 @@ Start a fresh native Codex session:
 codex
 ```
 
-Use `fable-ous install --codex-only` if Claude Code compatibility should not be installed or updated.
+The default installation is Codex-only. Claude Code is not touched.
 
 ## Exactly what it changes
 
@@ -57,7 +57,7 @@ Native Codex tool receipts remain visible. Another plugin can still display or e
 ## Commands
 
 ```text
-fable-ous install [--codex-only]
+fable-ous install [--with-claude]
 fable-ous doctor
 fable-ous style-off
 ```
@@ -66,7 +66,7 @@ fable-ous style-off
 
 ## Claude Code compatibility
 
-When installed without `--codex-only`, Claude Code receives the same three-sentence presentation contract as an output style that preserves Claude's coding instructions. Fable-ous does not launch Claude, select a model, or bypass its settings.
+Claude Code compatibility is opt-in through `fable-ous install --with-claude`. It receives the same three-sentence presentation contract as an output style that preserves Claude's coding instructions. Fable-ous does not launch Claude, select a model, or bypass its settings.
 
 ## Development
 

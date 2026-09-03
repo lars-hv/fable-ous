@@ -355,7 +355,7 @@ function install(options) {
     throw new Error("Codex did not bind an enabled artifact to the expected Fable-ous release.");
   }
 
-  if (!options["codex-only"] && commandExists("claude")) {
+  if (options["with-claude"] === true && commandExists("claude")) {
     const claudeHome = process.env.CLAUDE_CONFIG_DIR
       ? resolve(process.env.CLAUDE_CONFIG_DIR)
       : resolve(homedir(), ".claude");
@@ -470,11 +470,11 @@ function help() {
   process.stdout.write(`Fable-ous · native Codex plugin
 
 Install once, then run Codex normally:
-  fable-ous install [--codex-only] [--migrate-legacy]
+  fable-ous install [--with-claude] [--migrate-legacy]
   codex
 
 Commands:
-  fable-ous install [--codex-only] [--migrate-legacy]
+  fable-ous install [--with-claude] [--migrate-legacy]
   fable-ous doctor
   fable-ous style-off        Remove only the reversible Codex communication layer
 `);
