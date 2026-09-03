@@ -20,7 +20,6 @@ import {
   nativeCodexPreferenceValues,
   removeCodexCommunicationLayer
 } from "../plugins/fable-ous/scripts/activation.mjs";
-import { analyzeStyle } from "../plugins/fable-ous/scripts/style.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGIN_ROOT = resolve(ROOT, "plugins/fable-ous");
@@ -467,18 +466,6 @@ function doctor() {
   }
 }
 
-async function lint(options = {}) {
-  let input = "";
-  for await (const chunk of process.stdin) input += chunk;
-  const previousMessage = options["previous-message"];
-  const issues = analyzeStyle(input, {
-    allowLong: options["allow-long"] === true || options["allow-long"] === "true",
-    previousMessages: typeof previousMessage === "string" ? [previousMessage] : []
-  });
-  process.stdout.write(`${JSON.stringify({ pass: issues.length === 0, issues }, null, 2)}\n`);
-  if (issues.length) process.exitCode = 1;
-}
-
 function help() {
   process.stdout.write(`Fable-ous · native Codex plugin
 
@@ -490,7 +477,6 @@ Commands:
   fable-ous install [--codex-only] [--migrate-legacy]
   fable-ous doctor
   fable-ous style-off        Remove only the reversible Codex communication layer
-  fable-ous lint [--allow-long] [--previous-message "..."] < response.txt
 `);
 }
 
@@ -499,7 +485,6 @@ export async function main(argv) {
   if (command === "install") return install(options);
   if (command === "style-off") return styleOff();
   if (command === "doctor") return doctor();
-  if (command === "lint") return lint(options);
   if (command === "help" || command === "--help" || command === "-h") return help();
   throw new Error(`Unknown command: ${command}`);
 }

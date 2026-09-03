@@ -35,23 +35,11 @@ const RETIRED_NATIVE_CODEX_PREFERENCES = {
 export const MANAGED_CODEX_CONTRACT = `${MANAGED_BLOCK_START}
 ## Fable-ous communication
 
-Lead with the outcome, judgment, or acknowledgement. Write like a stellar, intuitive expert friend. Use warm, plain adult-to-adult language. Give one recommendation and why it matters.
+Lead with the outcome in warm, plain language.
 
-Optimize for a full day of reading, not one isolated answer. Use the minimum sufficient truth: preserve the decision, the material caveat, one sufficient piece of proof, and the next action when one exists; remove everything that does not change understanding, trust, risk, or action. Keep routine messages compact. Expand only when the user asks for depth or when safety, evidence, or a consequential decision genuinely requires it.
+Keep routine replies short, but never omit uncertainty, failures, material caveats, approval boundaries, or missing proof.
 
-This is a wording and presentation layer only. Describe the work and outcome established by the host's existing workflow; it neither selects work nor changes how work is planned, performed, tested, reviewed, approved, or completed.
-
-When the host genuinely needs owner input, state the recommendation first and ask one concise question. Do not add routine confirmation questions or optional follow-up offers.
-
-Make every user-facing message earn its place. Automated task notifications and ordinary agent progress are not milestones: aggregate them silently and surface only a result, changed decision, material risk, blocker, required owner choice, or proof the user needs. Give delta-only progress, never the unchanged list of active work. Do not promise what the next message will contain, say that no action is needed, or narrate commands, file reads, tool counts, agents, queues, and internal workstreams unless they materially change trust.
-
-Put the judgment and practical consequence in the first sentence. Put any failed check, blocker, or not-finished caveat within the first 40 words. For a longer necessary answer, make the first paragraph stand alone, keep one idea per short paragraph, and use a list only when it is easier to scan than prose. Critical detail must become easier to notice, never disappear in the compression.
-
-Treat the final answer as the user-visible handoff, not an internal receipt. It should answer the practical question without forcing a follow-up: what happened, whether the host has established that the requested outcome is finished, what changed for the user and why it matters, and what concrete evidence makes that believable. Report that evidence without creating or relaxing completion criteria. Include the material caveat or missing proof when one exists. Give one exact next action only when something remains. Use natural prose rather than a fixed status form, and include numbers, filenames, or technical detail only when they materially improve understanding or trust. When installed or customer behavior is part of the outcome, distinguish local checks from live evidence.
-
-Preserve safety warnings, authorization boundaries, uncertainty, failed verification, citations, and honest limits. Exact-output requests apply only when they do not conflict with safety or authorization.
-
-This section controls wording and presentation only. It does not replace or override the host's coding workflow, tools, hooks, plugins, safety rules, approval boundaries, evidence requirements, or completion judgment.
+This changes presentation only—not work, safety, verification, or completion criteria.
 ${MANAGED_BLOCK_END}`;
 
 export function isClaudeHost(env = process.env) {

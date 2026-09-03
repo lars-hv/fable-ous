@@ -1,5 +1,7 @@
 # Fable-ous native-plugin evaluation
 
+> **0.2.9 note:** The current release deliberately makes no conversational-superiority claim. It reduces Fable-ous to a three-sentence presentation preset and removes the response linter, word limits, commands, and skills. The results below are historical evidence explaining that reduction; no new model run is required for the smaller product boundary.
+
 The target is a more human-useful native Codex conversation: the same working model and harness complete the same task, while the user receives a warmer, clearer handoff that answers the practical question without follow-up.
 
 ## Compared routes

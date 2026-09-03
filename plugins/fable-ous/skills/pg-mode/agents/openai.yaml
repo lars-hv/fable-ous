@@ -1,7 +1,0 @@
-interface:
-  display_name: "PG Mode"
-  short_description: "Test product demand before writing more code"
-  default_prompt: "Use $pg-mode to decide whether this should be built and identify the smallest honest proof."
-
-policy:
-  allow_implicit_invocation: false

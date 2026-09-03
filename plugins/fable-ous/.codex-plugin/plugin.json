@@ -1,7 +1,7 @@
 {
   "name": "fable-ous",
-  "version": "0.2.8+codex.20260831174915",
-  "description": "Presentation-focused native Codex communication with coding controls left to the host.",
+  "version": "0.2.9+codex.20260903103232",
+  "description": "Minimal native Codex presentation with work controls left to the host.",
   "author": {
     "name": "Lars"
   },
@@ -10,23 +10,20 @@
     "communication",
     "style",
     "concise",
-    "proactive",
     "codex"
   ],
-  "skills": "./skills/",
   "interface": {
     "displayName": "Fable-ous",
     "shortDescription": "Calmer Codex communication via the Fable-ous installer.",
-    "longDescription": "Run `fable-ous install` once to apply the reversible native Codex communication contract and calm settings. Coding, safety, evidence, and authorization controls remain owned by the host.",
+    "longDescription": "Run `fable-ous install` once to apply a minimal reversible Codex presentation preset. Work, safety, verification, and completion remain owned by Codex and the host workflow.",
     "developerName": "Lars",
     "category": "Productivity",
     "capabilities": [
       "Interactive"
     ],
     "defaultPrompt": [
-      "Give me the direct recommendation and why it matters.",
-      "Tell me naturally whether the requested outcome is finished and what proves it.",
-      "Explain this plainly without process narration."
+      "Lead with the outcome in warm, plain language.",
+      "Keep this routine reply short without omitting material caveats or missing proof."
     ]
   }
 }

@@ -84,18 +84,10 @@ test("installs one reversible Codex instruction block and stays idempotent", () 
   assert.match(marker.binding, /^[0-9a-f]{32}$/);
   assert.match(marker.targetBinding, /^[0-9a-f]{64}$/);
   assert.match(content, new RegExp(`codex-style:boundary:${marker.binding}`));
-  assert.match(content, /minimum sufficient truth/i);
-  assert.match(content, /within the first 40 words/i);
-  assert.match(content, /wording and presentation only/i);
-  assert.match(content, /neither selects work nor changes/i);
-  assert.match(content, /user-visible handoff/i);
-  assert.match(content, /without forcing a follow-up/i);
-  assert.match(content, /what changed for the user and why it matters/i);
-  assert.match(content, /concrete evidence/i);
-  assert.match(content, /without creating or relaxing completion criteria/i);
-  assert.match(content, /one exact next action only when something remains/i);
-  assert.match(content, /when installed or customer behavior is part of the outcome/i);
-  assert.doesNotMatch(content, /continue through safe|do not end while|do the inspection|do all necessary work|never reduce necessary work|likely intent/i);
+  assert.match(content, /lead with the outcome in warm, plain language/i);
+  assert.match(content, /never omit uncertainty, failures, material caveats, approval boundaries, or missing proof/i);
+  assert.match(content, /presentation only—not work, safety, verification, or completion criteria/i);
+  assert.doesNotMatch(content, /continue|ask|question|likely intent|what changed for the user|within the first 40 words|120-word|delta-only|full day of reading/i);
   assert.equal(isCodexStyleLayerActive(paths), true);
 });
 
@@ -398,7 +390,7 @@ test("reports a stale or edited managed block as inactive until install repairs 
   const paths = fixture();
   ensureCodexStyleLayer(paths);
   writeFileSync(paths.agentsPath, readFileSync(paths.agentsPath, "utf8").replace(
-    "Use warm, plain adult-to-adult language.",
+    "Lead with the outcome in warm, plain language.",
     "Use opaque internal jargon."
   ));
 
@@ -958,8 +950,6 @@ test("communication surfaces contain no stopping or completion policy", () => {
     "plugins/fable-ous/.codex-plugin/plugin.json",
     "plugins/fable-ous/output-styles/fable-ous.md",
     "plugins/fable-ous/scripts/activation.mjs",
-    "plugins/fable-ous/scripts/style.mjs",
-    "plugins/fable-ous/skills/voice-status/SKILL.md",
   ];
   const forbidden = /do not end while|continue through safe|finish when|work remains|optional improvements are not unfinished/i;
 
@@ -968,37 +958,22 @@ test("communication surfaces contain no stopping or completion policy", () => {
   }
 });
 
-test("Codex and Claude carry the same communication-only outcome contract", () => {
+test("Codex and Claude carry the same minimal presentation contract", () => {
   const claudeStyle = readFileSync(
     new URL("../plugins/fable-ous/output-styles/fable-ous.md", import.meta.url),
     "utf8"
   );
   for (const pattern of [
-    /warm[^\n]*plain|plain[^\n]*warm/i,
-    /stellar[^\n]*intuitive expert friend/i,
-    /full day of reading/i,
-    /minimum sufficient truth/i,
-    /automated task notifications and ordinary agent progress are not milestones/i,
-    /delta-only progress/i,
-    /within the first 40 words/i,
-    /one idea per short paragraph/i,
-    /wording and presentation only/i,
-    /neither selects work nor changes/i,
-    /genuinely needs owner input/i,
-    /user-visible handoff/i,
-    /without forcing a follow-up/i,
-    /what changed for the user and why it matters/i,
-    /concrete evidence/i,
-    /without creating or relaxing completion criteria/i,
-    /one exact next action only when something remains/i,
-    /when installed or customer behavior is part of the outcome/i,
-    /does not replace or override/i
+    /lead with the outcome in warm, plain language/i,
+    /never omit uncertainty, failures, material caveats, approval boundaries, or missing proof/i,
+    /presentation only—not work, safety, verification, or completion criteria/i
   ]) {
     assert.match(MANAGED_CODEX_CONTRACT, pattern);
     assert.match(claudeStyle, pattern);
   }
   assert.match(claudeStyle, /keep-coding-instructions:\s*true/i);
   assert.match(claudeStyle, /force-for-plugin:\s*true/i);
-  assert.doesNotMatch(MANAGED_CODEX_CONTRACT, /do the inspection|do all necessary work|never reduce necessary work|likely intent/i);
-  assert.doesNotMatch(claudeStyle, /do the inspection|do all necessary work|never reduce necessary work|likely intent/i);
+  const forbiddenBehavior = /autonom|continue|ask|question|likely intent|what changed for the user|within the first 40 words|120-word|delta-only|full day of reading/i;
+  assert.doesNotMatch(MANAGED_CODEX_CONTRACT, forbiddenBehavior);
+  assert.doesNotMatch(claudeStyle, forbiddenBehavior);
 });
