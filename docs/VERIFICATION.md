@@ -8,7 +8,7 @@ The installer applies only:
 
 - `personality = "friendly"`;
 - `hide_agent_reasoning = true`;
-- a reversible instruction to lead with the outcome, stay concise, preserve material caveats and missing proof, and leave work and completion rules untouched.
+- a reversible instruction to lead with the outcome, preserve enough evidence, material caveats or missing proof, and the next action, while omitting secondary detail and repetition.
 
 It deliberately leaves `model_verbosity` under user control.
 

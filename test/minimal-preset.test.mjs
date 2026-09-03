@@ -11,7 +11,7 @@ const PLUGIN = new URL("../plugins/fable-ous/", import.meta.url);
 
 const MINIMAL_PRESENTATION = [
   "Lead with the outcome in warm, plain language.",
-  "Keep routine replies short, but never omit uncertainty, failures, material caveats, approval boundaries, or missing proof.",
+  "Preserve the evidence needed to trust the result, material caveats or missing proof, and the next action when one exists; omit secondary detail and repetition.",
   "This changes presentation only—not work, safety, verification, or completion criteria."
 ].join("\n\n");
 

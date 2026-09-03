@@ -85,7 +85,7 @@ test("installs one reversible Codex instruction block and stays idempotent", () 
   assert.match(marker.targetBinding, /^[0-9a-f]{64}$/);
   assert.match(content, new RegExp(`codex-style:boundary:${marker.binding}`));
   assert.match(content, /lead with the outcome in warm, plain language/i);
-  assert.match(content, /never omit uncertainty, failures, material caveats, approval boundaries, or missing proof/i);
+  assert.match(content, /preserve the evidence needed to trust the result, material caveats or missing proof/i);
   assert.match(content, /presentation only—not work, safety, verification, or completion criteria/i);
   assert.doesNotMatch(content, /continue|ask|question|likely intent|what changed for the user|within the first 40 words|120-word|delta-only|full day of reading/i);
   assert.equal(isCodexStyleLayerActive(paths), true);
@@ -965,7 +965,7 @@ test("Codex and Claude carry the same minimal presentation contract", () => {
   );
   for (const pattern of [
     /lead with the outcome in warm, plain language/i,
-    /never omit uncertainty, failures, material caveats, approval boundaries, or missing proof/i,
+    /preserve the evidence needed to trust the result, material caveats or missing proof/i,
     /presentation only—not work, safety, verification, or completion criteria/i
   ]) {
     assert.match(MANAGED_CODEX_CONTRACT, pattern);

@@ -1,6 +1,8 @@
 # Fable-ous
 
-Fable-ous is a minimal, reversible presentation preset for native Codex. It makes routine replies warmer, calmer, and outcome-first without changing how Codex chooses work, uses tools, verifies results, handles safety, or decides that work is complete.
+Fable-ous is a minimal, reversible presentation preset for native Codex. It makes the handoff easier to trust: outcome first, enough evidence, the important caveat, and the next action—without changing how Codex works.
+
+Codex is already concise. Fable-ous does not try to make every answer shorter; it tells Codex what must survive the compression and removes secondary detail and repetition. It also hides reasoning events and uses Codex's native friendly personality.
 
 The preset deliberately stays small. Model instructions are probabilistic, so Fable-ous does not claim to improve code quality, reasoning, autonomy, or truthfulness. Those remain the responsibility of Codex and the user's existing workflow.
 
@@ -33,7 +35,7 @@ The installer makes three reversible Codex changes:
 
 > Lead with the outcome in warm, plain language.
 >
-> Keep routine replies short, but never omit uncertainty, failures, material caveats, approval boundaries, or missing proof.
+> Preserve the evidence needed to trust the result, material caveats or missing proof, and the next action when one exists; omit secondary detail and repetition.
 >
 > This changes presentation only—not work, safety, verification, or completion criteria.
 

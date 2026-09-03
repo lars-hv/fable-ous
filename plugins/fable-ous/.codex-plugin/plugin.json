@@ -1,6 +1,6 @@
 {
   "name": "fable-ous",
-  "version": "0.2.9+codex.20260903120519",
+  "version": "0.2.9+codex.20260903122017",
   "description": "Minimal native Codex presentation with work controls left to the host.",
   "author": {
     "name": "Lars"
@@ -14,8 +14,8 @@
   ],
   "interface": {
     "displayName": "Fable-ous",
-    "shortDescription": "Calmer Codex communication via the Fable-ous installer.",
-    "longDescription": "Run `fable-ous install` once to apply a minimal reversible Codex presentation preset. Work, safety, verification, and completion remain owned by Codex and the host workflow.",
+    "shortDescription": "Outcome-first Codex replies that preserve proof and caveats.",
+    "longDescription": "Run `fable-ous install` once to apply a minimal reversible Codex presentation preset. It prioritizes the outcome, enough evidence, material caveats, and the next action while leaving work, safety, verification, and completion to Codex.",
     "developerName": "Lars",
     "category": "Productivity",
     "capabilities": [
@@ -23,7 +23,7 @@
     ],
     "defaultPrompt": [
       "Lead with the outcome in warm, plain language.",
-      "Keep this routine reply short without omitting material caveats or missing proof."
+      "Preserve enough evidence, material caveats or missing proof, and the next action; omit secondary detail and repetition."
     ]
   }
 }
