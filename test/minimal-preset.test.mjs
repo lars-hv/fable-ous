@@ -8,6 +8,7 @@ import { MANAGED_CODEX_CONTRACT } from "../plugins/fable-ous/scripts/activation.
 
 const ROOT = new URL("../", import.meta.url);
 const PLUGIN = new URL("../plugins/fable-ous/", import.meta.url);
+const normalizeNewlines = (value) => value.replace(/\r\n?/gu, "\n");
 
 const MINIMAL_PRESENTATION = [
   "Lead with the outcome in warm, plain language.",
@@ -18,12 +19,16 @@ const MINIMAL_PRESENTATION = [
 test("installs only the minimal presentation contract", () => {
   assert.match(MANAGED_CODEX_CONTRACT, new RegExp(MINIMAL_PRESENTATION.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
-  const claudeStyle = readFileSync(new URL("output-styles/fable-ous.md", PLUGIN), "utf8");
+  const claudeStyle = normalizeNewlines(readFileSync(new URL("output-styles/fable-ous.md", PLUGIN), "utf8"));
   assert.match(claudeStyle, new RegExp(MINIMAL_PRESENTATION.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
   const forbiddenBehavior = /autonom|continue|ask|question|likely intent|what changed for the user|within the first 40 words|120-word|delta-only|full day of reading/i;
   assert.doesNotMatch(MANAGED_CODEX_CONTRACT, forbiddenBehavior);
   assert.doesNotMatch(claudeStyle, forbiddenBehavior);
+});
+
+test("minimal presentation comparison is portable across Windows line endings", () => {
+  assert.equal(normalizeNewlines("first\r\n\r\nsecond\r\n"), "first\n\nsecond\n");
 });
 
 test("ships no runtime, linter, command, or skill surface", () => {
