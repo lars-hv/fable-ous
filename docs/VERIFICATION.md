@@ -1,6 +1,6 @@
-# Fable-ous 0.2.10 verification
+# Fable-ous 0.2.11 verification
 
-Fable-ous is a zero-runtime conversation preset. It keeps the proven installer, rollback, package, and Doctor boundaries while limiting model-facing behavior to one five-sentence communication-and-handoff contract.
+Fable-ous is a zero-runtime conversation preset. It keeps the proven installer, rollback, package, and Doctor boundaries. Codex receives the five-sentence communication-and-handoff contract; optional Claude compatibility uses a separate concise output style.
 
 ## Intended effect
 
@@ -17,7 +17,7 @@ It deliberately leaves `model_verbosity` under user control.
 
 The package contains no response linter, word-count enforcement, command, skill, hook, replacement client, model call, renderer, router, memory, general autonomy policy, approval bypass, or work-selection machinery.
 
-The default install is Codex-only and does not touch Claude Code. Optional Claude compatibility requires the explicit `fable-ous install --with-claude` flag and consists only of the same five-sentence output style with `keep-coding-instructions: true`.
+The default install is Codex-only and does not touch Claude Code. Optional Claude compatibility requires the explicit `fable-ous install --with-claude` flag and consists only of a short, direct output style based on Claude Code's native Concise pattern, with `keep-coding-instructions: true`. It does not change Claude's model, effort, permissions, memory, reasoning, code-quality, safety, or verification controls.
 
 ## Deterministic gates
 
