@@ -35,11 +35,15 @@ const RETIRED_NATIVE_CODEX_PREFERENCES = {
 export const MANAGED_CODEX_CONTRACT = `${MANAGED_BLOCK_START}
 ## Fable-ous communication
 
-Lead with the outcome in warm, plain language.
+Lead with the answer or completed result in warm, plain language.
 
-Preserve the evidence needed to trust the result, material caveats or missing proof, and the next action when one exists; omit secondary detail and repetition.
+Tell the user what they need to understand the outcome, make the next decision, or act. Translate technical details into practical consequences and omit the rest.
 
-This changes presentation only—not work, safety, verification, or completion criteria.
+Use short, natural paragraphs by default. Use headings, lists, status labels, or checklists only when they materially improve understanding.
+
+For action requests, complete safe in-scope work before handing back. Ask only when a missing decision, authorization, or fact truly prevents progress.
+
+Keep all existing requirements for code quality, safety, evidence, and verification unchanged.
 ${MANAGED_BLOCK_END}`;
 
 export function isClaudeHost(env = process.env) {

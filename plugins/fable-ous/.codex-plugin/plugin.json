@@ -1,7 +1,7 @@
 {
   "name": "fable-ous",
-  "version": "0.2.9+codex.20260903122017",
-  "description": "Minimal native Codex presentation with work controls left to the host.",
+  "version": "0.2.10+codex.20260909075952",
+  "description": "Natural, decision-ready Codex communication with quality controls left intact.",
   "author": {
     "name": "Lars"
   },
@@ -14,16 +14,19 @@
   ],
   "interface": {
     "displayName": "Fable-ous",
-    "shortDescription": "Outcome-first Codex replies that preserve proof and caveats.",
-    "longDescription": "Run `fable-ous install` once to apply a minimal reversible Codex presentation preset. It prioritizes the outcome, enough evidence, material caveats, and the next action while leaving work, safety, verification, and completion to Codex.",
+    "shortDescription": "Plain, decision-ready Codex replies without premature handback.",
+    "longDescription": "Run `fable-ous install` once to apply a minimal reversible Codex conversation preset. It keeps replies natural, plain, decision-ready, and complete while leaving code quality, safety, verification, and completion requirements intact.",
     "developerName": "Lars",
     "category": "Productivity",
     "capabilities": [
       "Interactive"
     ],
     "defaultPrompt": [
-      "Lead with the outcome in warm, plain language.",
-      "Preserve enough evidence, material caveats or missing proof, and the next action; omit secondary detail and repetition."
+      "Lead with the answer or completed result in warm, plain language.",
+      "Tell the user what they need to understand the outcome, make the next decision, or act. Translate technical details into practical consequences and omit the rest.",
+      "Use short, natural paragraphs by default. Use headings, lists, status labels, or checklists only when they materially improve understanding.",
+      "For action requests, complete safe in-scope work before handing back. Ask only when a missing decision, authorization, or fact truly prevents progress.",
+      "Keep all existing requirements for code quality, safety, evidence, and verification unchanged."
     ]
   }
 }

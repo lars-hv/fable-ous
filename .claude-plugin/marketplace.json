@@ -3,14 +3,14 @@
   "owner": {
     "name": "Lars"
   },
-  "description": "Minimal calm presentation for coding agents.",
+  "description": "Natural, decision-ready communication for coding agents.",
   "plugins": [
     {
       "name": "fable-ous",
       "displayName": "Fable-ous",
       "source": "./plugins/fable-ous",
-      "description": "Make Codex and Claude Code communicate calmly without changing how work is performed.",
-      "version": "0.2.9",
+      "description": "Make Codex and Claude Code communicate naturally without weakening code quality or verification.",
+      "version": "0.2.10",
       "author": {
         "name": "Lars"
       },
