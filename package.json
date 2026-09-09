@@ -1,7 +1,7 @@
 {
   "name": "fable-ous",
-  "version": "0.2.9",
-  "description": "A minimal reversible presentation preset for native Codex.",
+  "version": "0.2.10",
+  "description": "A minimal reversible conversation preset for native Codex.",
   "author": "Lars",
   "repository": {
     "type": "git",

@@ -84,10 +84,12 @@ test("installs one reversible Codex instruction block and stays idempotent", () 
   assert.match(marker.binding, /^[0-9a-f]{32}$/);
   assert.match(marker.targetBinding, /^[0-9a-f]{64}$/);
   assert.match(content, new RegExp(`codex-style:boundary:${marker.binding}`));
-  assert.match(content, /lead with the outcome in warm, plain language/i);
-  assert.match(content, /preserve the evidence needed to trust the result, material caveats or missing proof/i);
-  assert.match(content, /presentation only—not work, safety, verification, or completion criteria/i);
-  assert.doesNotMatch(content, /continue|ask|question|likely intent|what changed for the user|within the first 40 words|120-word|delta-only|full day of reading/i);
+  assert.match(content, /lead with the answer or completed result in warm, plain language/i);
+  assert.match(content, /translate technical details into practical consequences/i);
+  assert.match(content, /use short, natural paragraphs by default/i);
+  assert.match(content, /complete safe in-scope work before handing back/i);
+  assert.match(content, /keep all existing requirements for code quality, safety, evidence, and verification unchanged/i);
+  assert.doesNotMatch(content, /within the first 40 words|120-word|delta-only|full day of reading/i);
   assert.equal(isCodexStyleLayerActive(paths), true);
 });
 
@@ -390,7 +392,7 @@ test("reports a stale or edited managed block as inactive until install repairs 
   const paths = fixture();
   ensureCodexStyleLayer(paths);
   writeFileSync(paths.agentsPath, readFileSync(paths.agentsPath, "utf8").replace(
-    "Lead with the outcome in warm, plain language.",
+    "Lead with the answer or completed result in warm, plain language.",
     "Use opaque internal jargon."
   ));
 
@@ -944,36 +946,40 @@ test("explicit FABLE_OUS paths take precedence over CODEX_HOME", () => {
   assert.equal(preferences.configDir, env.FABLE_OUS_CONFIG_DIR);
 });
 
-test("communication surfaces contain no stopping or completion policy", () => {
+test("communication surfaces keep the handoff rule bounded away from work machinery", () => {
   const root = new URL("../", import.meta.url);
   const surfaces = [
     "plugins/fable-ous/.codex-plugin/plugin.json",
     "plugins/fable-ous/output-styles/fable-ous.md",
     "plugins/fable-ous/scripts/activation.mjs",
   ];
-  const forbidden = /do not end while|continue through safe|finish when|work remains|optional improvements are not unfinished/i;
+  const required = /complete safe in-scope work before handing back/i;
+  const forbidden = /model rout|lifecycle hook|response linter|approval bypass|hidden continuation/i;
 
   for (const relative of surfaces) {
+    assert.match(readFileSync(new URL(relative, root), "utf8"), required, relative);
     assert.doesNotMatch(readFileSync(new URL(relative, root), "utf8"), forbidden, relative);
   }
 });
 
-test("Codex and Claude carry the same minimal presentation contract", () => {
+test("Codex and Claude carry the same focused conversation contract", () => {
   const claudeStyle = readFileSync(
     new URL("../plugins/fable-ous/output-styles/fable-ous.md", import.meta.url),
     "utf8"
   );
   for (const pattern of [
-    /lead with the outcome in warm, plain language/i,
-    /preserve the evidence needed to trust the result, material caveats or missing proof/i,
-    /presentation only—not work, safety, verification, or completion criteria/i
+    /lead with the answer or completed result in warm, plain language/i,
+    /translate technical details into practical consequences/i,
+    /use short, natural paragraphs by default/i,
+    /complete safe in-scope work before handing back/i,
+    /keep all existing requirements for code quality, safety, evidence, and verification unchanged/i
   ]) {
     assert.match(MANAGED_CODEX_CONTRACT, pattern);
     assert.match(claudeStyle, pattern);
   }
   assert.match(claudeStyle, /keep-coding-instructions:\s*true/i);
   assert.match(claudeStyle, /force-for-plugin:\s*true/i);
-  const forbiddenBehavior = /autonom|continue|ask|question|likely intent|what changed for the user|within the first 40 words|120-word|delta-only|full day of reading/i;
+  const forbiddenBehavior = /model rout|lifecycle hook|response linter|within the first 40 words|120-word|delta-only|full day of reading/i;
   assert.doesNotMatch(MANAGED_CODEX_CONTRACT, forbiddenBehavior);
   assert.doesNotMatch(claudeStyle, forbiddenBehavior);
 });

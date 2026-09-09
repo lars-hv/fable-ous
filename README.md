@@ -1,10 +1,10 @@
 # Fable-ous
 
-Fable-ous is a minimal, reversible presentation preset for native Codex. It makes the handoff easier to trust: outcome first, enough evidence, the important caveat, and the next action—without changing how Codex works.
+Fable-ous is a minimal, reversible conversation preset for native Codex. It tells the user what they need to understand the result or make the next decision, without turning routine work into a technical status report.
 
-Codex is already concise. Fable-ous does not try to make every answer shorter; it tells Codex what must survive the compression and removes secondary detail and repetition. It also hides reasoning events and uses Codex's native friendly personality.
+Codex is already concise. Fable-ous does not try to make every answer shorter; it asks Codex to use natural, level-matched language, preserve material proof and risk, and finish safe in-scope work before handing back. It also hides reasoning events and uses Codex's native friendly personality.
 
-The preset deliberately stays small. Model instructions are probabilistic, so Fable-ous does not claim to improve code quality, reasoning, autonomy, or truthfulness. Those remain the responsibility of Codex and the user's existing workflow.
+The preset deliberately stays small. Model instructions are probabilistic, so Fable-ous does not claim to improve code quality, reasoning, or truthfulness. Those remain the responsibility of Codex and the user's existing workflow. Its handoff rule does not bypass approvals or redefine what safe, verified, or complete means.
 
 Fable-ous is independent open-source software. It is not affiliated with, endorsed by, or derived from Anthropic or the Claude Fable model. The name describes the intended experience; it does not claim model equivalence.
 
@@ -31,13 +31,17 @@ The installer makes three reversible Codex changes:
 
 - sets `personality = "friendly"`;
 - sets `hide_agent_reasoning = true`;
-- adds this presentation-only block to the user's Codex `AGENTS.md`:
+- adds this communication-and-handoff block to the user's Codex `AGENTS.md`:
 
-> Lead with the outcome in warm, plain language.
+> Lead with the answer or completed result in warm, plain language.
 >
-> Preserve the evidence needed to trust the result, material caveats or missing proof, and the next action when one exists; omit secondary detail and repetition.
+> Tell the user what they need to understand the outcome, make the next decision, or act. Translate technical details into practical consequences and omit the rest.
 >
-> This changes presentation only—not work, safety, verification, or completion criteria.
+> Use short, natural paragraphs by default. Use headings, lists, status labels, or checklists only when they materially improve understanding.
+>
+> For action requests, complete safe in-scope work before handing back. Ask only when a missing decision, authorization, or fact truly prevents progress.
+>
+> Keep all existing requirements for code quality, safety, evidence, and verification unchanged.
 
 The installer records only the settings and instruction block it owns. `fable-ous style-off` restores prior values when they are still plugin-managed and preserves later user changes.
 
@@ -49,7 +53,7 @@ Fable-ous adds no:
 - replacement client or terminal;
 - model calls, renderer, or router;
 - model-verbosity override;
-- autonomy or work-selection rules;
+- general autonomy policies, approval bypasses, or new work-selection machinery;
 - memory or personal-data collection;
 - response linter or word-count enforcement;
 - commands or skills.
@@ -64,11 +68,11 @@ fable-ous doctor
 fable-ous style-off
 ```
 
-`doctor` verifies the installed source, active artifact, managed presentation block, native settings, and the absence of hooks or a replacement client.
+`doctor` verifies the installed source, active artifact, managed conversation block, native settings, and the absence of hooks or a replacement client.
 
 ## Claude Code compatibility
 
-Claude Code compatibility is opt-in through `fable-ous install --with-claude`. It receives the same three-sentence presentation contract as an output style that preserves Claude's coding instructions. Fable-ous does not launch Claude, select a model, or bypass its settings.
+Claude Code compatibility is opt-in through `fable-ous install --with-claude`. It receives the same five-sentence conversation contract as an output style that preserves Claude's coding instructions. Fable-ous does not launch Claude, select a model, or bypass its settings.
 
 ## Development
 
