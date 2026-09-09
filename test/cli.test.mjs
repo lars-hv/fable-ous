@@ -187,13 +187,14 @@ test("public onboarding keeps ordinary Codex as the product entrypoint", () => {
   const readme = readFileSync(new URL("README.md", ROOT), "utf8");
 
   assert.match(readme, /npm install --global github:lars-hv\/fable-ous/);
-  assert.match(readme, /npm package is not published yet/i);
-  assert.match(readme, /\bcodex\b/);
-  assert.match(readme, /native Codex/i);
+  assert.match(readme, /Install directly from the public GitHub repository/i);
+  assert.match(readme, /Enable Codex \(the default\)/i);
+  assert.match(readme, /fable-ous install --with-claude/);
+  assert.match(readme, /Optional Claude Code support/i);
   assert.doesNotMatch(readme, /Focus Mode|official Codex SDK|fable-ous strict|fable-ous ask/i);
-  assert.match(readme, /conversation preset/i);
+  assert.match(readme, /communication only/i);
   assert.match(readme, /probabilistic/i);
-  assert.match(readme, /does not claim to improve code quality|no code-quality claim/i);
+  assert.match(readme, /does not replace either model or claim to improve reasoning, coding quality/i);
   assert.match(readme, /doctor/i);
   assert.doesNotMatch(readme, /voice-status|PG mode|\bfable-ous lint\b/i);
 });

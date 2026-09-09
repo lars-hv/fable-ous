@@ -1,29 +1,34 @@
 # Fable-ous
 
-Fable-ous is a minimal, reversible conversation preset for native Codex. It tells the user what they need to understand the result or make the next decision, without turning routine work into a technical status report.
+Fable-ous makes Codex clearer, warmer, and easier to work with. It helps Codex lead with the result, explain what matters in plain language, and finish safe in-scope work before handing back.
 
-Codex is already concise. Fable-ous does not try to make every answer shorter; it asks Codex to use natural, level-matched language, preserve material proof and risk, and finish safe in-scope work before handing back. It also hides reasoning events and uses Codex's native friendly personality.
+Optional Claude Code support provides shorter, more direct responses. Fable-ous changes communication only: it does not replace either model or claim to improve reasoning, coding quality, safety, or verification.
 
-The preset deliberately stays small. Model instructions are probabilistic, so Fable-ous does not claim to improve code quality, reasoning, or truthfulness. Those remain the responsibility of Codex and the user's existing workflow. Its handoff rule does not bypass approvals or redefine what safe, verified, or complete means.
+The preset is minimal and reversible. Model instructions are probabilistic, and Fable-ous never bypasses approvals or changes what safe, verified, or complete means.
 
 Fable-ous is independent open-source software. It is not affiliated with, endorsed by, or derived from Anthropic or the Claude Fable model. The name describes the intended experience; it does not claim model equivalence.
 
 ## Install
 
+Install directly from the public GitHub repository:
+
 ```bash
 npm install --global github:lars-hv/fable-ous
+```
+
+Enable Codex (the default):
+
+```bash
 fable-ous install
 ```
 
-The npm package is not published yet. The GitHub command installs the public repository directly.
-
-Start a fresh native Codex session:
+Or enable both Codex and Claude Code:
 
 ```bash
-codex
+fable-ous install --with-claude
 ```
 
-The default installation is Codex-only. Claude Code is not touched.
+Start a fresh session with `codex` or `claude` after installation.
 
 ## Exactly what it changes
 
