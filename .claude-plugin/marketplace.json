@@ -3,7 +3,7 @@
   "owner": {
     "name": "Lars"
   },
-  "description": "Natural, decision-ready communication for coding agents.",
+  "description": "Natural, decision-ready Codex communication, with optional Claude Code compatibility.",
   "plugins": [
     {
       "name": "fable-ous",

@@ -1,6 +1,6 @@
 # Fable-ous native-plugin evaluation
 
-> **0.2.11 note:** This release makes no conversational-superiority claim. Codex keeps the five-sentence conversation-and-handoff preset, while opt-in Claude compatibility uses a separate native-concise pattern. Fable-ous still adds no response linter, word limits, commands, or skills. The results below remain historical context; the release relies on deterministic boundary checks rather than another token-heavy model run.
+> **0.2.11 note:** This release makes no conversational-superiority claim. Codex keeps the communication-and-handoff preset, while opt-in Claude compatibility uses a separate native-concise pattern. Fable-ous still adds no response linter, word limits, commands, or skills. The results below remain historical context; the release relies on deterministic boundary checks rather than another token-heavy model run.
 
 The target is a more human-useful native Codex conversation: the same working model and harness complete the same task, while the user receives a warmer, clearer handoff that answers the practical question without follow-up.
 

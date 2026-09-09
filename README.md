@@ -1,8 +1,8 @@
 # Fable-ous
 
-Fable-ous makes Codex clearer, warmer, and easier to work with. It helps Codex lead with the result, explain what matters in plain language, and finish safe in-scope work before handing back.
+Fable-ous is a communication plugin for people who use Codex—especially those who moved from Claude Code or use both but work mainly in Codex. It helps Codex lead with the result, explain what matters in plain language, and finish safe in-scope work before handing back.
 
-Optional Claude Code support provides shorter, more direct responses. Fable-ous changes communication only: it does not replace either model or claim to improve reasoning, coding quality, safety, or verification.
+Optional Claude Code support provides shorter, more direct responses. Fable-ous changes communication only—it does not replace either model or claim to improve reasoning, code quality, safety, or verification.
 
 The preset is minimal and reversible. Model instructions are probabilistic, and Fable-ous never bypasses approvals or changes what safe, verified, or complete means.
 
@@ -75,7 +75,7 @@ fable-ous style-off
 
 `doctor` verifies the installed source, active artifact, managed conversation block, native settings, and the absence of hooks or a replacement client.
 
-## Claude Code compatibility
+## Claude Code compatibility (optional)
 
 Claude Code compatibility is opt-in through `fable-ous install --with-claude`. It receives a short, direct output style based on Claude Code's native Concise pattern, with Claude's coding instructions preserved. Fable-ous does not launch Claude, select a model, change effort, permissions, or memory, or claim to improve Claude's reasoning or code quality.
 
