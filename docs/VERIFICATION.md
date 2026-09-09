@@ -1,6 +1,6 @@
 # Fable-ous 0.2.11 verification
 
-Fable-ous is a zero-runtime conversation preset. It keeps the proven installer, rollback, package, and Doctor boundaries. Codex receives the five-sentence communication-and-handoff contract; optional Claude compatibility uses a separate concise output style.
+Fable-ous is a zero-runtime conversation preset. It keeps the proven installer, rollback, package, and Doctor boundaries. Codex receives the communication-and-handoff contract; optional Claude compatibility uses a separate concise output style.
 
 ## Intended effect
 
