@@ -950,7 +950,6 @@ test("communication surfaces keep the handoff rule bounded away from work machin
   const root = new URL("../", import.meta.url);
   const surfaces = [
     "plugins/fable-ous/.codex-plugin/plugin.json",
-    "plugins/fable-ous/output-styles/fable-ous.md",
     "plugins/fable-ous/scripts/activation.mjs",
   ];
   const required = /complete safe in-scope work before handing back/i;
@@ -962,24 +961,16 @@ test("communication surfaces keep the handoff rule bounded away from work machin
   }
 });
 
-test("Codex and Claude carry the same focused conversation contract", () => {
+test("Claude uses the concise native pattern without changing host controls", () => {
   const claudeStyle = readFileSync(
     new URL("../plugins/fable-ous/output-styles/fable-ous.md", import.meta.url),
     "utf8"
   );
-  for (const pattern of [
-    /lead with the answer or completed result in warm, plain language/i,
-    /translate technical details into practical consequences/i,
-    /use short, natural paragraphs by default/i,
-    /complete safe in-scope work before handing back/i,
-    /keep all existing requirements for code quality, safety, evidence, and verification unchanged/i
-  ]) {
-    assert.match(MANAGED_CODEX_CONTRACT, pattern);
-    assert.match(claudeStyle, pattern);
-  }
+  assert.match(MANAGED_CODEX_CONTRACT, /complete safe in-scope work before handing back/i);
+  assert.match(claudeStyle, /Keep your responses short and direct while doing the work just as thoroughly\./);
   assert.match(claudeStyle, /keep-coding-instructions:\s*true/i);
   assert.match(claudeStyle, /force-for-plugin:\s*true/i);
-  const forbiddenBehavior = /model rout|lifecycle hook|response linter|within the first 40 words|120-word|delta-only|full day of reading/i;
+  const forbiddenBehavior = /model rout|effort|permission|auto memory|lifecycle hook|response linter|within the first 40 words|120-word|delta-only|full day of reading/i;
   assert.doesNotMatch(MANAGED_CODEX_CONTRACT, forbiddenBehavior);
   assert.doesNotMatch(claudeStyle, forbiddenBehavior);
 });

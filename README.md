@@ -72,7 +72,7 @@ fable-ous style-off
 
 ## Claude Code compatibility
 
-Claude Code compatibility is opt-in through `fable-ous install --with-claude`. It receives the same five-sentence conversation contract as an output style that preserves Claude's coding instructions. Fable-ous does not launch Claude, select a model, or bypass its settings.
+Claude Code compatibility is opt-in through `fable-ous install --with-claude`. It receives a short, direct output style based on Claude Code's native Concise pattern, with Claude's coding instructions preserved. Fable-ous does not launch Claude, select a model, change effort, permissions, or memory, or claim to improve Claude's reasoning or code quality.
 
 ## Development
 

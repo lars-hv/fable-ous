@@ -18,11 +18,12 @@ const CONVERSATION_CONTRACT = [
   "Keep all existing requirements for code quality, safety, evidence, and verification unchanged."
 ].join("\n\n");
 
-test("installs only the focused conversation contract", () => {
+test("keeps the Codex contract and a native-concise Claude style", () => {
   assert.match(MANAGED_CODEX_CONTRACT, new RegExp(CONVERSATION_CONTRACT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
   const claudeStyle = normalizeNewlines(readFileSync(new URL("output-styles/fable-ous.md", PLUGIN), "utf8"));
-  assert.match(claudeStyle, new RegExp(CONVERSATION_CONTRACT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(claudeStyle, /Keep your responses short and direct while doing the work just as thoroughly\./);
+  assert.doesNotMatch(claudeStyle, new RegExp(CONVERSATION_CONTRACT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
   const forbiddenBehavior = /model routing|lifecycle hook|response linter|within the first 40 words|120-word|delta-only|full day of reading/i;
   assert.doesNotMatch(MANAGED_CODEX_CONTRACT, forbiddenBehavior);

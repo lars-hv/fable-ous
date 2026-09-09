@@ -10,7 +10,7 @@
       "displayName": "Fable-ous",
       "source": "./plugins/fable-ous",
       "description": "Make Codex and Claude Code communicate naturally without weakening code quality or verification.",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "author": {
         "name": "Lars"
       },
